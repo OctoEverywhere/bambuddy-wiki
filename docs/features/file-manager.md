@@ -116,6 +116,24 @@ Your library contains uploaded and archived files:
 - 3MF and sliced gcode files
 - Linked folders connected to projects/archives
 
+### Folder Ownership & Sharing
+
+Every folder has an owner, the user who made it. What you see of the folder tree depends on your library permission:
+
+- **`library:read_all`** (View all library files) — every folder.
+- **`library:read_own`** (View own library files) — your own folders, folders **shared with everyone**, folders that hold one of your files, and the folders above those so you can reach them. Other users' folders are hidden.
+
+A folder's file count and last-activity time only count the files you can see.
+
+**Sharing a folder.** Users with `library:update_all` can open a folder's menu (:material-dots-vertical:) and choose **Share with everyone**; **Stop sharing** undoes it. A shared folder shows a :material-account-multiple: icon. Everyone sees it and can add files and subfolders to it, but renaming and deleting it stays with its owner and admins. Sharing applies to that one folder: a folder inside it is shared only if it is marked too.
+
+**Where you can add files.** With `library:read_own` you can upload, extract ZIPs, move files, create subfolders and import from MakerWorld or Manyfold into your own folders, shared folders and the top level. In a folder you only pass through (one above your own files), **Upload** and **New Folder** are disabled, and the Move dialog greys it out.
+
+!!! example "A classroom"
+    The teacher creates **Class Project** and shares it. Each student sees **Class Project** and their own folders, and nothing of the other students. A student's subfolder inside **Class Project** belongs to the student and stays private to them, so the teacher sees everyone's work while students only see their own.
+
+**Folders from before this feature.** On upgrade, a folder whose files (subfolders and trashed files included) all belong to one user becomes that user's folder, and an empty folder inside it goes with it. Every other existing folder (empty, used by several people, linked to a project or archive, external, or the **MakerWorld** and **Manyfold** import folders) is shared, so it stays visible as before. Folders created while authentication is off, and newly linked external folders, are shared too, so turning authentication on later hides nothing; an admin can stop sharing them.
+
 ### File Information
 
 Each file shows:
@@ -126,6 +144,35 @@ Each file shows:
 - Print count (if printed before)
 - Uploaded by (when authentication is enabled)
 - Last-modified date (optional — toggle it on from the sort controls; see [Sorting](#sorting))
+
+---
+
+## :material-view-column: Column View
+
+Next to **Grid** and **List**, the view switcher in the File Manager header offers **Column view** — Miller columns, as in the macOS Finder or a file dialog. It shows where you are in the folder hierarchy and lets you walk up and down it without going back to the tree on the left.
+
+![File Manager column view](../assets/file_manager_columns.png){ .screenshot }
+
+- **One column per folder level.** The first column lists the top-level folders, each selected folder opens its subfolders in the next column, and the pane on the right lists the selected folder's files.
+- **Every column lists that level's files as well**, below its subfolders, so a folder that holds files but no subfolders never looks empty. The first column shows the files that sit in no folder at all. Clicking a file in one of the earlier columns focuses it without changing the selected folder.
+- **One selection, everywhere.** Clicking a folder in a column is the same as clicking it in the tree, and the columns follow the tree's selection too. Folders show their file count and a chevron when they have subfolders; external folders keep their own icon, and the internal / external split works as in the tree.
+- **Actions**: file rows carry the same icons as the list view (Print, Slice, Run with pipeline, Preview, Download, File details, Rename, Generate Thumbnail, Delete), shown on hover — always on touch devices and on the focused row. Folder rows have the tree's :material-dots-vertical: menu. Double-click a file to open its [preview](#opening-a-preview).
+- **Search and tag filters** find matches in every subfolder, so while one is active the folder columns step aside and the file list takes the full width.
+- **Selections stay with their folder**: switching to another folder clears the selection (in every view), so Move and Delete never act on files that are no longer on screen.
+- The view is remembered in your browser, like Grid and List.
+
+### Keyboard
+
+The column view is keyboard-driven once it has focus (it takes it when the view opens; click into it after using the search box).
+
+| Shortcut | Action |
+|----------|--------|
+| ++arrow-up++ ++arrow-down++ | Move within the current column. Past a column's last folder the column's own files follow; ++arrow-up++ at the first file steps back onto the folders |
+| ++arrow-right++ or ++enter++ (on a folder) | Open the first subfolder; on a folder without subfolders, move into its files |
+| ++arrow-left++ | Go up one level, or leave the file list |
+| ++enter++ (on a file) | Open the file's preview |
+| ++space++ | Select or deselect the focused file |
+| Menu key or ++shift+f10++ | Jump into the focused file's action icons (++arrow-left++ / ++arrow-right++ walk them, ++enter++ activates one, ++escape++ returns to the columns); on a folder, open its :material-dots-vertical: menu |
 
 ---
 
@@ -321,9 +368,10 @@ During extraction:
 
 ---
 
-## :material-cube-outline: STL Thumbnail Generation
+## :material-cube-outline: STL and PDF Thumbnail Generation
 
-Generate preview thumbnails for STL files to make them easier to identify in your library.
+Bambuddy renders grid thumbnails for STL models and PDF documents itself, so
+both are easy to identify in your library without opening them.
 
 ### Automatic Generation on Upload
 
@@ -336,23 +384,24 @@ When uploading STL files:
 
 Thumbnails are generated automatically during the upload process.
 
-### Generate for Existing STL Files
+PDF files get their first page as the thumbnail on every upload; the checkbox
+only governs STL, because a mesh render takes seconds and a PDF page does not.
 
-For STL files already in your library:
+### Generate for Existing Files
 
-1. Click **Generate Thumbnails** button in the toolbar
-2. Select which files to process:
-    - **All missing** - Only STL files without thumbnails
-    - **Selected files** - Only checked files
-    - **Entire folder** - All STL files in current folder
-3. Click **Generate**
-4. Thumbnails appear as they're created
+For STL and PDF files already in your library, click **Generate Thumbnails**
+in the toolbar. It renders every STL and PDF file that has no thumbnail yet,
+in all folders, and the new thumbnails appear in the grid once the run is
+finished. A toast reports how many succeeded and failed.
+
+With `library:update_all` the run covers everyone's files. With only
+`library:update_own` it covers the files you uploaded yourself.
 
 ### Single File Generation
 
 Generate a thumbnail for one file:
 
-1. Find the STL file
+1. Find the STL or PDF file
 2. Click the three-dot menu (:material-dots-vertical:)
 3. Select **Generate Thumbnail**
 4. The thumbnail updates automatically when done
@@ -365,15 +414,21 @@ When extracting ZIP files containing STL files:
 2. Check **Generate thumbnails for STL files**
 3. Thumbnails are created for all STL files in the archive
 
+PDF files inside the archive are thumbnailed as well, checkbox or not.
+
 ### Technical Details
 
 | Feature | Details |
 |---------|---------|
-| **Rendering** | Lit 3D isometric view using trimesh and matplotlib |
+| **STL rendering** | Lit 3D isometric view using trimesh and matplotlib |
 | **Shading** | A single directional light offset from the camera, so adjacent faces catch it differently and the model shows relief rather than a flat outline |
 | **Color** | Shades of Bambu green (#00AE42) on a dark background |
+| **PDF rendering** | First page rasterised with pypdfium2 (PDFium) and centred on a white 256 × 256 px square, the same shape as a thumbnail from the browser preview |
 | **Format** | PNG (RGBA, fully opaque) |
 | **Size** | Optimized for thumbnail display |
+
+!!! note "When the server cannot render a PDF"
+    `pypdfium2` is a regular dependency and bundles PDFium for every platform Bambuddy ships on (Linux x86_64, arm64 and armv7, macOS, Windows), so no system package is needed. A PDF that PDFium cannot read gets no server thumbnail. If the browser preview can still open it, the first time someone does so that render becomes the thumbnail instead. A password-protected PDF gets neither a thumbnail nor a preview: the preview has no password prompt.
 
 !!! tip "Large STL Files"
     Very complex STL files (100k+ vertices) may take longer to process. The generator handles these gracefully.
@@ -389,6 +444,106 @@ When extracting ZIP files containing STL files:
 
 !!! tip "Large STEP files"
     STEP files are converted to a 3D mesh in your browser. A large export can take a minute or more; the preview shows **Converting STEP model…** with a running seconds counter while it works, so leave it open until the model appears.
+
+---
+
+## :material-file-eye: Document, Image & CAD Previews
+
+Beyond the printable formats, the File Manager can preview the other files a
+real job folder tends to contain — source geometry, drawings, part lists and
+reference photos — without downloading them
+([#2976](https://github.com/maziggy/bambuddy/issues/2976)):
+
+| File type | Preview |
+|-----------|---------|
+| **STEP** (`.step`, `.stp`) | Interactive 3D view — rotate, zoom and reset exactly like the STL viewer. Multi-part assemblies keep their per-part colours when the file defines them. |
+| **PDF** (`.pdf`) | Inline page viewer with page navigation and zoom. |
+| **Spreadsheets** (`.csv`, `.xlsx`, `.ods`) | Read-only table view. Workbooks with several sheets show one tab per sheet. |
+| **Images** (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.bmp`) | Fitted to the window, then zoom and drag to look closer. |
+
+Printable files have a preview too: `.stl` and source `.3mf` open the 3D
+viewer, and a sliced file (`.gcode`, `.gcode.3mf`) opens the full-page G-code
+viewer.
+
+TIFF files (`.tiff`, `.tif`) get a thumbnail on their card, but no preview:
+browsers other than Safari cannot display them, so the file has to be
+downloaded to be looked at.
+
+### Opening a preview
+
+There are three ways, and they all open the same thing:
+
+- **Double-click** the file — on its card in grid view, or on its row in list
+  or column view (in column view, **Enter** on the focused file does the
+  same). A file with no preview simply does nothing.
+- The **Preview** button in the toolbar above the file list, which appears as
+  soon as exactly one previewable file is selected.
+- The file's own menu: the three-dot menu (:material-dots-vertical:) on the
+  card in grid view, or the preview icon among the row's actions in list and
+  column view.
+
+Previewing needs the same `library:read_own` / `library:read_all` permission
+as downloading the file.
+
+### Fullscreen and zoom
+
+Every preview opens in one large window — as wide as the screen allows, up to
+1800 px — with a fullscreen button in its header, and a **double-click on the
+preview area** toggles fullscreen too. `Esc` leaves fullscreen; press it again
+to close the preview. Where the browser does not allow fullscreen for page
+elements (iPhone Safari, some embedded views) the preview fills the browser
+window instead.
+
+- **PDF**: `Ctrl`/`⌘` + mouse wheel and trackpad pinch zoom around the
+  pointer; on a touch screen, pinch with two fingers. The plain wheel zooms
+  while the whole page is visible and scrolls once it is not. Keyboard:
+  `+` / `-` step the zoom, `0` resets it. The zoom buttons remain.
+- **3D viewer (STL, STEP)**: mouse wheel or pinch to zoom, drag to orbit,
+  right-drag to pan, in the window and in fullscreen alike. The zoom range is
+  bounded so the model can never be dollied out of view; **Reset** returns to
+  the framed view.
+- **Images**: the picture opens fitted to the window. The mouse wheel, a
+  trackpad pinch and the `+` / `-` keys zoom around the pointer, `0` and the
+  reset button go back to the fitted view, and once the picture is bigger than
+  the window you can drag it around.
+
+### Thumbnails
+
+- **PDF**: the first page is rendered **on the server** when the file is
+  uploaded or extracted from a ZIP, and through the toolbar's **Generate
+  Thumbnails** button — nobody has to open the file. PDFs found by an
+  external folder scan are rendered in the background after the scan
+  finishes, alongside the STL thumbnails, so they fill in over the following
+  seconds. See [STL and PDF Thumbnail Generation](#stl-and-pdf-thumbnail-generation).
+- **Images** are thumbnailed by the server as well, from the picture itself,
+  on upload / ZIP extraction / external scan.
+- **STEP and spreadsheets** are rendered **in your browser** — the server has
+  no CAD kernel. The first time someone opens a preview, that first render is
+  stored as the file's grid thumbnail (a STEP model's 3D view, a mini table for
+  spreadsheets). Until then the grid shows a per-type icon. Persisting the
+  thumbnail requires `library:update_own` / `library:update_all`; users
+  without it still get the full preview, only the thumbnail is skipped. The
+  same browser fallback covers a PDF the server could not render, as long as
+  the browser can open it.
+- A thumbnail that already exists is never replaced by a preview render.
+
+### Limits & fallback behaviour
+
+- Spreadsheets over **20 MB**, and PDFs and images over **50 MB**, show a
+  "too large to preview" notice instead of stalling the browser.
+- Very large sheets are truncated in the view (first 500 rows / 40 columns,
+  with a notice saying so) — scrolling covers the rest of the day-to-day
+  cases; the preview is not an editor.
+- A broken or unreadable file falls back to a short message in the preview
+  and keeps its generic icon in the grid; nothing errors out. That includes
+  password-protected PDFs, which the preview cannot unlock.
+- STEP files are converted to a 3D mesh in your browser. A large export can
+  take a minute or more; the preview shows **Converting STEP model…** with a
+  running seconds counter while it works, so leave it open until the model
+  appears.
+- The preview libraries (OpenCascade WASM for STEP, pdf.js, SheetJS,
+  PapaParse) are loaded on demand, so they add nothing to the app's initial
+  load time.
 
 ---
 
@@ -424,6 +579,35 @@ Opening a model's 3D preview gives you the same action as a **split button** in 
 - With the sidecar **on**, the primary button slices server-side and the menu offers a desktop handoff to **either** slicer, so you can send a single file to a local GUI without turning the sidecar off.
 
 The chevron is absent when the file cannot go to a slicer at all, in which case the button itself is disabled.
+
+### Combine STLs onto one plate (#2999)
+
+The slicer sidecar slices one file at a time, so several separate STLs &mdash; the parts of an enclosure, or a dozen copies of one small clip &mdash; would each end up on a plate of their own. **Combine to 3MF** puts them into a single 3MF first, which then slices onto one plate like any other project.
+
+![Combine to 3MF in the selection toolbar](../assets/combine-to-3mf-toolbar.png){ .screenshot }
+
+1. Select the STLs in the file browser. **Combine to 3MF** appears in the selection toolbar when *every* selected file is an STL; mix in a 3MF or a sliced file and the button is hidden rather than quietly leaving part of the selection out.
+2. In the dialog, set how many **copies** of each model you want and adjust the file name if you like. The total is shown underneath; one plate takes at most 100 objects.
+3. Click **Combine**. The new `.3mf` is written to the folder you are in, with its own thumbnail. The source STLs are left untouched.
+
+![Combine to 3MF dialog](../assets/combine-to-3mf-dialog.png){ .screenshot }
+
+With **Use Slicer API** on, **Open the slicer when done** (ticked by default) goes straight to the slice modal for the new file with [auto-arrange](slicer-api.md#auto-orient-and-auto-arrange) already ticked, so the slicer lays the objects out on the target bed. Tick **Auto-orient objects** as well if the parts need turning onto their best printing side.
+
+| Combined 3MF | Sliced with auto-arrange |
+|--------------|--------------------------|
+| ![Combined models in the 3D preview](../assets/combine-to-3mf-model.jpg){ .screenshot } | ![The same plate after slicing](../assets/combine-to-3mf-sliced.jpg){ .screenshot } |
+
+A few things worth knowing:
+
+- **Copies share one mesh.** Each STL is stored once in the 3MF and every copy points at it, so ten copies of a 5 MB model make a file of about 5 MB, not 50. Picking the same file twice counts as one model with the copies added together.
+- **Size limits.** The selected STLs can add up to 300 MB on disk and 5 million triangles, counting each model once however many copies you ask for. Past that the combine is refused with a message saying which limit was hit. Typical printable parts are well under this.
+- **The file opens sensibly in a desktop slicer too.** The objects are pre-placed side by side with a small gap rather than stacked on the origin, and the 3MF carries its own preview image, so the combined file is also a reasonable starting point in Bambu Studio or OrcaSlicer.
+- **Slicing it again later.** Opened from its file card instead of straight after combining, the slice modal starts with auto-arrange unticked, as for any file. Tick it if the layout needs redoing for a different bed.
+- **STL only.** 3MF, STEP and sliced files can't be combined.
+
+!!! info "Permissions"
+    Combining writes a new file into the library and needs `library:upload`. Only files you can see can be combined; with `library:read_own` that means your own uploads.
 
 ---
 
@@ -539,11 +723,14 @@ Admins can also change how long trashed files live on the Trash page itself (1�
 
 ### Deleting Folders
 
-Folders have no owner, so deleting a folder **with contents** (a cascade delete of everything inside) requires the `library:delete_all` permission.
+Deleting a folder deletes everything inside it. With `library:delete_all` you can delete any folder.
 
-Users with only `library:delete_own` can still delete **empty** folders — for example a folder they created and have since emptied out. "Empty" is strict: the folder must contain no subfolders and no files, *including trashed files* (a trashed file still belongs to whoever deleted it and must stay restorable). External folders and folders linked to a project or archive always require `library:delete_all`, even when empty.
+With only `library:delete_own` you can delete:
 
-The folder tree's Delete entry reflects this: on a non-empty folder it is disabled with a "You can only delete empty folders" hint.
+- **your own folder**, when everything inside it is yours too: every subfolder and every file, *including trashed files* (a trashed file still belongs to whoever deleted it and must stay restorable);
+- **an empty folder without an owner** (one made before [folder ownership](#folder-ownership-sharing)), with no subfolders and no files, trashed ones included.
+
+External folders and folders linked to a project or archive always require `library:delete_all`, even when empty. The folder menu's Delete entry is disabled with a hint when you can't delete the folder.
 
 ---
 
@@ -601,6 +788,8 @@ Rename files and folders directly in the File Manager.
 4. Click **Rename** to save
 
 ### Renaming a Folder
+
+With `library:update_all` you can rename any folder; with `library:update_own`, your own folders. Linking a folder and sharing it need `library:update_all`.
 
 1. Hover over the folder in the sidebar (on a touch device its actions are always visible)
 2. Click the three-dot menu (:material-dots-vertical:)
@@ -729,7 +918,7 @@ External folders are indexed on creation. To pick up new or removed files:
 3. New files are added, deleted files are removed from the index
 
 !!! info "Files Are Not Copied"
-    Bambuddy indexes external files into its database but reads them directly from the original path. No disk space is used for file copies. Thumbnails for 3MF, STL, and gcode files are generated and stored locally.
+    Bambuddy indexes external files into its database but reads them directly from the original path. No disk space is used for file copies. Thumbnails for 3MF, STL, PDF, and gcode files are generated and stored locally.
 
 ### Read-Only Protection
 

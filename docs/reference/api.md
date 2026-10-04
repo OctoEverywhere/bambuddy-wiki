@@ -180,7 +180,7 @@ GET /printers/{id}/status
       "code": "0x8004",
       "attr": 50364420,
       "module": 3,
-      "severity": 3,
+      "severity": 2,
       "actions": [],
       "job_id": "1234567890",
       "full_code": "03008004",
@@ -193,7 +193,11 @@ GET /printers/{id}/status
 
 `layer_num` is the current layer; `total_layers` is the layer count of the running job. `temperatures` carries a `_target` companion for the heaters that have one, and omits `chamber` entirely on models without a chamber sensor. `state` is the firmware's own value (`IDLE`, `PREPARE`, `SLICING`, `RUNNING`, `PAUSE`, `FINISH`, `FAILED`), not a lowercased Bambuddy label.
 
-`description` is the resolved text for the fault, so a client does not have to carry its own copy of the error catalogue to tell a user what happened. It is English only and is not localized. It is `null` whenever the catalogue does not cover the code, which is common for faults sourced from the printer's `hms[]` array. Treat `null` as "no text available", never as "no fault": the fault is fully reported either way, and `full_code` is what identifies it. The same field is on the `printer_status` [WebSocket](../features/monitoring.md) message.
+`full_code` identifies the fault: 16 hex characters for a fault from the printer's `hms[]` array (the four groups the printer screen shows), 8 for a `print_error`.
+
+`severity` is Bambu's alert level: `1` error (the print was stopped), `2` warning (the print is paused), `3` notice (the print carries on), `0` when the printer set no valid level. For an `hms[]` fault it is the level the printer sends; a `print_error` carries no level, so it is taken from the first digit of the error number (`4xxx` → 1, `8xxx` → 2, `Cxxx` → 3).
+
+`description` is the text Bambu publishes for the fault on this printer model, taken from Bambu Studio's HMS files, so a client does not have to carry its own copy of the catalogue. It is English only and is not localized. It is `null` when Bambu publishes no text for the code. Treat `null` as "no text available", never as "no fault": the fault is fully reported either way, and `full_code` is what identifies it. Bambuddy's own UI counts a fault when it offers actions, or when it has a description and isn't an `hms[]` notice (`severity` 3 with a 16-character `full_code`). The same fields are on the `printer_status` [WebSocket](../features/monitoring.md) message.
 
 `awaiting_plate_clear` is a Bambuddy-side gate, not printer telemetry. It goes `true` when a print reaches a terminal state and stays `true` until the plate is confirmed clear via [Clear Plate](#clear-plate); the queue will not dispatch the next job in the meantime. It survives restarts and Auto Off power cycles, so a printer that reports `IDLE` after a reboot can still be waiting. The same flag is pushed over the [WebSocket](../features/monitoring.md) `printer_status` message and over [MQTT](../features/mqtt.md) — including a dedicated retained topic, which is the better subscription for automations because it does not depend on the printer still being powered on.
 
@@ -989,9 +993,10 @@ GET /printers/{printer_id}/overlay-status
 ```
 
 Everything the [streaming overlay](../features/camera.md#streaming-overlay-for-obs)
-draws for one printer — name, camera rotation, live print state, and the one
-display setting it reads. A token-authenticated sibling of the printer status
-endpoint, so an OBS browser source with no login session can back the overlay.
+draws for one printer — name, model, camera rotation, live print state,
+temperatures, and the one display setting it reads. A token-authenticated
+sibling of the printer status endpoint, so an OBS browser source with no login
+session can back the overlay.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -1005,6 +1010,7 @@ file being printed, so it sits behind its own scope.
 {
   "id": 1,
   "name": "X1C-Lab",
+  "model": "X1C",
   "camera_rotation": 0,
   "connected": true,
   "state": "RUNNING",
@@ -1015,13 +1021,33 @@ file being printed, so it sits behind its own scope.
   "layer_num": 120,
   "total_layers": 300,
   "stg_cur_name": null,
+  "temperatures": {"nozzle": 219.7, "nozzle_target": 220.0, "bed": 60.0, "bed_target": 60.0},
   "time_format": "system"
 }
 ```
 
+`model` is `null` when the printer has none stored. `temperatures` holds only
+the readings the printer reports and is `{}` when it reports none; chamber
+readings are left out on models without a real chamber sensor.
+
 That object is the entire payload. Like the Cam Wall feed it carries no
 `serial_number`, `ip_address`, or `access_code` — but it *does* carry the print
 filename, which is why the overlay scope is distinct from `camwall`.
+
+---
+
+### Overlay branding logo
+
+All paths below are relative to `/api/v1`. The logo is shared by the installation.
+
+| Method | Path | Purpose | Permission when login is enabled |
+|--------|------|---------|----------------------------------|
+| `POST` | `/settings/overlay-logo` | Upload multipart `file` | `settings:update` |
+| `GET` | `/settings/overlay-logo` | Read PNG for settings preview | `settings:read` |
+| `DELETE` | `/settings/overlay-logo` | Remove saved logo | `settings:update` |
+| `GET` | `/overlay-branding/logo?token=...` | Read PNG for OBS | Valid `overlay` token |
+
+Uploads accept static PNG and WebP images up to 2 MiB and 4 million pixels. Images are decoded, resized to fit 512 × 512, and stored as PNG with transparency. Invalid images return `400`; oversized uploads return `413`. Reading a missing logo returns `404`. Reads use `Cache-Control: no-store`. Upload and delete return `{"status":"ok"}`. Deleting an absent logo succeeds.
 
 ---
 

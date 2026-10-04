@@ -258,6 +258,32 @@ Three things are never hidden:
 
 Switching the printer re-filters both dropdowns immediately and re-picks any selection the change left incompatible. [Re-slicing for a different printer](#re-slicing-for-a-different-printer) is fully supported, so the filter is a default view rather than a restriction &mdash; **Show all** is always one click away.
 
+### Only online printers and loaded spools
+
+When you slice away from the printer, the useful choices are the spools that are already in it. Two checkboxes above the **Printer profile** dropdown narrow the lists to that. Both are off until you turn them on, and your browser remembers them.
+
+- **Only printers that are online** &mdash; the **Printer profile** dropdown lists the models that are connected right now, at every nozzle size. If the profile Bambuddy picked for you is for a model that isn't online, it moves to one that is: the file's own printer when that model is online, otherwise the 0.4&nbsp;mm profile of an online model. A printer you picked yourself stays.
+- **Only spools that are loaded** &mdash; each **Filament profile** dropdown lists the profiles of the spools loaded in the online printers of the selected model. The automatic pick for each slot is made from those spools. A profile you picked yourself stays.
+
+Profiles the checkboxes hold back sit behind the same **Show all** link, in a **Not online** or **Not loaded** group. Bambuddy never filters down to an empty list. A printer profile whose model it can't read from the name, such as a renamed custom printer, always stays. When no printer is online, or no loaded spool matches a profile for the selected printer, the dialog says so and shows the full lists.
+
+Each filament row also has a **Pick** button. It opens a **Loaded spools** screen with one section per online printer of the selected model:
+
+- Each AMS is shown as its four slots, empty ones included, so it matches the unit.
+- AMS-HT units follow, then an external spool when one is in the holder.
+- Clicking a spool sets that row's profile and its colour, so the preview matches the spool.
+- A spool with no profile for the selected printer is shown greyed out and can't be picked.
+
+How a spool finds its profile, strongest first:
+
+1. **The profile set for the slot in Bambuddy**, the one shown on the printer card, when the slot hasn't been changed since and the profile is for the selected printer.
+2. **The same profile for the selected printer.** A profile set for an X1C finds the H2D copy with the same name when you slice for an H2D.
+3. **A spool set up from the slicer or the printer's screen.** Its brand text is used, so a Bambu "PLA Basic" spool finds **Bambu PLA Basic**, and a spool with no brand finds **Generic &lt;material&gt;**.
+
+A profile that states a different material from the spool is never matched. Spools are matched by their profile, not by material alone, so a loaded PLA doesn't bring in every PLA profile.
+
+Which printers you see here follows [printer access](authentication.md#printer-access), and the checkboxes only appear for users who may see printer status.
+
 ### Re-slicing for a different printer
 
 The **Printer** dropdown defaults to the printer the source 3MF was prepared for, but is not constrained to it. A 3MF sliced for an X1C can be re-sliced for an H2D (or any other model), and vice versa &mdash; pick the target printer and slice as normal. The slicer regenerates the G-code from scratch using the target printer's bed size, kinematics, nozzle count, and start/end G-code; only the model geometry and paint/colour assignments carry over from the source file.
@@ -351,6 +377,7 @@ A few things worth knowing:
 - **They also apply on the "Slice as designed" path.** Unlike the preset dropdowns and bed type, these act on the geometry rather than the print config, so they stay available whichever settings drive the slice.
 - **Auto-arrange is project-wide in the slicer.** Combined with **Slice all plates** that would collapse every plate's objects onto a single bed, so Bambuddy slices each plate separately and merges the results &mdash; see the ["Slice all plates" toggle](#slice-all-plates-toggle) below. Auto-orient has no such problem: it rotates objects where they stand and never moves one between plates.
 - **Cross-class re-slices arrange regardless.** [That case](#cross-class-re-slice-single-nozzle-h2d) needs the arrange pass to avoid the H2D's dead zones, so leaving the box unticked doesn't switch it off there.
+- **Several STLs on one plate.** The sidecar takes one model per slice; to slice separate STLs (or copies of one) together, [combine them into one 3MF](file-manager.md#combine-stls-onto-one-plate-2999) first. The slice modal then opens with auto-arrange already ticked.
 
 ### Plate picker
 
@@ -383,11 +410,18 @@ For 3MF inputs that already carry embedded settings (e.g. exports from Bambu Stu
 
 Inside the SliceModal, dropdown sections are ordered **Imported &rarr; Orca Cloud &rarr; Bambu Cloud &rarr; Standard**, with auto-pick respecting the same priority when no metadata-aware match is found. Imported profiles win over cloud because they ship with parsed type / colour metadata, while cloud entries are listed by name only (Bambu Cloud rate-limits per-preset content fetches at the scale most users have). When a preset name appears in multiple tiers, Bambuddy backfills the cloud entry's metadata from the imported entry so cross-listed profiles still get auto-picked correctly. The standard tier is the slicer sidecar's stock bundled profiles &mdash; the unconditional fallback if nothing else resolves.
 
-The standard tier carries full metadata of its own. A bundled preset states its material and its compatible printers on an *ancestor* rather than on the preset itself &mdash; `Bambu ABS @BBL A1` inherits `Bambu ABS @base`, which inherits `fdm_filament_abs`, and only the last of those says `ABS` &mdash; so the sidecar resolves both through the inheritance chain before listing them. A handful of profiles in Bambu's own bundle inherit from a parent it doesn't ship; those are listed with no material rather than dropped, and stay eligible for auto-pick. **Colour is never among the resolved fields**: no bundled profile carries one at any depth, because colour belongs to the project rather than to the preset &mdash; see [Filament colour](#filament-colour).
+The standard tier carries full metadata of its own. A bundled preset states its material and its compatible printers on an *ancestor* rather than on the preset itself &mdash; `Bambu ABS @BBL A1` inherits `Bambu ABS @base`, which inherits `fdm_filament_abs`, and only the last of those says `ABS` &mdash; so the sidecar resolves both through the inheritance chain before listing them. A profile whose parent can't be found is listed with no material rather than dropped, and stays eligible for auto-pick.
+
+The standard tier lists every preset the slicer itself offers for a Bambu printer:
+
+- **Third-party filaments for Bambu printers**, such as *COEX PLA @BBL X1C* or *SUNLU PLA Matte @BBL X1C*. The slicer keeps these in per-brand folders.
+- **OrcaSlicer's filament library** (OrcaSlicer sidecar only): filaments such as *Elegoo PLA @System* that suit any printer. As in OrcaSlicer, one is offered on every Bambu printer except those where a filament made for that printer replaces it, so *Generic PLA @System* doesn't show on an X1 Carbon, which has *Generic PLA @BBL X1C*. Bambu Studio has no such library.
+
+The order of the list matters: when several presets fit a plate equally well, the automatic pick takes the first. Within the slicer's own presets, and again within the library, real filaments come before support materials, then Bambu Lab, then Generic, then other brands, alphabetical within each. A PLA plate therefore gets *Bambu PLA Basic* rather than a brand that merely sorts earlier, and a PA plate gets *Generic PA* rather than *Bambu Support For PA/PET*. The library comes after all of the slicer's own presets. **Colour is never among the resolved fields**: no bundled profile carries one at any depth, because colour belongs to the project rather than to the preset &mdash; see [Filament colour](#filament-colour).
 
 ---
 
-## :material-package-variant-closed-remove: Slicer Bundles (removed in 0.2.5)
+## :material-package-variant-closed-remove: Slicer Bundles (removed in 0.2.4.7)
 
 Bundle import as a managed unit &mdash; the old **Settings &rarr; Slicer &rarr; Slicer Bundles** panel that let you upload a `.bbscfg` and pick its printer + process + filament triplet from a single dropdown &mdash; was removed in 0.2.5. The panel itself was left in place as a notice for one release cycle and is now gone from Settings entirely.
 

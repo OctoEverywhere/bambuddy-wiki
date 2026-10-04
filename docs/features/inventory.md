@@ -32,7 +32,7 @@ The Spool Inventory page shows all your spools in a searchable, filterable table
 - **Stock filter**: All, Stock (no slicer profile), Configured (has slicer profile)
 - **Dropdowns**: Filter by Material, Brand, Category, Spool Name, **Storage Location**
     - The **Storage Location** chip lists every entry in your [storage locations catalog](storage-locations.md) (e.g. *Shelf A*, *4l drybox*), plus **No location set** for unassigned spools. The chip stays hidden until at least one spool has a storage location. Manage the catalog from **Inventory → Locations** — see [Storage Locations](storage-locations.md).
-- **Search**: Find spools by name, brand, material, or color
+- **Search**: Find spools by name, brand, material, or color. Enter an ID with a leading `#` (for example, `#42`) to find only that exact spool; a number without `#` keeps the normal partial search behavior. The same search works in the **Assign Spool** dialog and on the SpoolBuddy inventory page.
 - **View modes**: Table or Cards
 - **Group similar**: Toggle to visually collapse identical unused/unassigned spools into a single expandable row or card with a count badge (e.g., "5 identical spools"). Spools are grouped by material, subtype, brand, color, and label weight. Used or AMS-assigned spools always appear individually. Group state persists across sessions.
 
@@ -175,7 +175,8 @@ Custom materials work just like built-in ones for inventory tracking, usage hist
 | **Remaining Weight** | Current filament remaining — shows `label_weight - weight_used` with a reference maximum |
 | **Cost per kg** | Used for archive cost roll-ups in Statistics. |
 | **Category** | Free-text label like *Production*, *Prototype*, or *Client A*. Used purely for organisation — appears as an inventory filter chip and as a way to group spools that share a different low-stock threshold. The form autocompletes from categories already in use across your other spools so casing stays consistent. Optional. |
-| **Low-stock threshold (this spool)** | Per-spool override of the global low-stock percentage. Leave blank to use whatever's set in the inventory's stat-card threshold control (default 20 %). Useful for marking *production* spools to alert earlier (e.g. 50 %) while letting *prototype* spools stay quiet until much later. The override applies to both the stat-card "Low Stock" count and the "Low Stock" filter. |
+| **Material No.** | Your internal purchasing / article number (e.g. *15* = Bambu Lab PLA Basic). Shared by every spool of the same product — see [Material Numbers](#material-numbers). Optional. |
+| **Low-stock threshold (this spool)** | Per-spool override of the global low-stock percentage. Leave blank to use whatever's set in the inventory's stat-card threshold control (default 20 %). Useful for marking *production* spools to alert earlier (e.g. 50 %) while letting *prototype* spools stay quiet until much later. The override applies to the stat-card "Low Stock" count, the "Low Stock" filter and the [Low Filament notification](notifications.md#printer-events). |
 | **Storage Location** | Physical shelf, drawer, or drybox from your [locations catalog](storage-locations.md). Pick an existing entry from the dropdown or type a new name and click **Add**. |
 | **Note** | Free-text notes about the spool |
 
@@ -266,19 +267,35 @@ Assign inventory spools to AMS slots to track which filament is loaded where.
 
 ### Assigning a Spool
 
+You can start an assignment from either the printer card or the spool itself.
+
+#### From a printer card
+
 1. Hover over any AMS slot on the printer card (empty or configured, non-Bambu-Lab)
 2. Click **Assign Spool** in the hover card
 
 ![Assign Spool](../assets/inventory-assign.png){ .screenshot }
 
-3. Select a spool from the filtered list
+3. Select a spool from the filtered list. Each result includes its `#ID`, which helps distinguish otherwise identical spools.
 4. Click **Assign Spool** to confirm
 
 The assign modal automatically:
 
-- **Filters out Bambu Lab spools** — these are tracked via RFID and managed by the AMS
 - **Filters out already-assigned spools** — each spool can only be in one slot at a time
-- Shows only manually added (non-BL) spools
+- **Shows only matching spools** — a spool is listed when its slicer profile or material matches the slot (a partial material match counts, so a PLA spool fits a PLA Basic slot). **Show all spools** lifts this filter and also lists spools already assigned to another slot
+
+#### From the spool editor or QR view
+
+1. Open an existing spool from Inventory, or scan its Bambuddy QR code.
+2. If the spool has no slot yet, click **Assign Spool** in the spool editor. An assigned spool shows **Unassign** there instead.
+3. Select the printer, then an AMS, AMS-HT or external slot.
+4. Review the selected slot and click **Assign Spool** to confirm.
+
+To change the spool's color, use the **Color & Cost** tab in the spool editor.
+
+Selecting a slot does not change the assignment until you click the confirmation button. If the spool material conflicts with the material reported by the slot, Bambuddy asks you to confirm the mismatch. An offline printer or an unavailable AMS is shown in the dialog instead of silently failing.
+
+Keyboard users can select AMS slots with <kbd>Enter</kbd> or <kbd>Space</kbd>.
 
 ### Bulk actions
 
@@ -335,6 +352,8 @@ Slots containing Bambu Lab spools (identified by RFID) do not show assign/unassi
 
     The same happens when the slot's filament stops matching the spool at all — a different colour or a different material means a different roll is in there, so the stale assignment is released rather than left pointing at filament you are no longer printing. A slot that empties during a print is left alone, because that is a runout and the spool is still in the AMS.
 
+    Taking a spool out releases its assignment after two minutes, not at once. The AMS sometimes reports a slot, or a whole unit, as empty for a moment while every spool stays where it is, and an assignment released on that report would be lost for good. A slot that reads normally again within the two minutes keeps its assignment. A different spool the AMS can identify still releases the old assignment straight away. One it cannot read releases it when the two minutes are up.
+
 !!! info "Stable Assignments on Startup"
     Spool assignments are preserved across Bambuddy restarts. If the same spool is still in the slot (verified by RFID identifiers), the assignment is kept without sending any commands to the printer.
 
@@ -355,6 +374,9 @@ AMS slot configuration tells the **printer** what filament profile to use for a 
 !!! info "When to Configure vs When to Assign"
     - **Assign Spool**: Links an inventory spool to a slot for tracking (weight, usage history, cost) **and automatically configures the slot** with the spool's filament profile, color, and K-profile. Works on both configured and empty slots.
     - **Configure Slot**: Manually sends a specific filament profile to the printer. Useful when you want to override the auto-configured settings or set up a slot without an inventory spool.
+
+!!! note "A lost K-profile is put back"
+    A printer can drop a slot's K-profile selection, for example after a power cycle, and fall back to the default K. While the printer is idle, Bambuddy notices this on any slot with an assigned spool and re-selects the spool's stored K-profile for that printer and nozzle. The queue checks the same thing for a job's slots right before sending it. A *different* profile chosen in Bambu Studio is left alone, and so is **Default** chosen in Configure Slot. (A profile chosen in Configure Slot becomes the spool's stored profile, so that is the one put back.) If a profile won't stick after three tries (for example because it was deleted on the printer), the log says so and Bambuddy stops retrying until the slot changes.
 
 #### Where Configure Slot Presets Come From
 
@@ -471,6 +493,137 @@ Configure in **Settings → Filament**:
 
 ---
 
+## :material-store: Suppliers
+
+The spool record's **Brand** says who *made* the filament; suppliers say
+where you *buy* it ([#2988](https://github.com/maziggy/bambuddy/issues/2988)).
+The same product is often available from several shops at different prices,
+and one shop carries many brands — so suppliers are a managed master list
+with an n:m assignment, not a free-text field that drifts in spelling.
+
+- **Master list**: the **Suppliers** button on the Inventory page toolbar,
+  right next to **Locations** — suppliers are the same kind of inventory
+  master data that spools reference. Each supplier has a name (required),
+  website/shop URL, your own customer number there, and a note. Names are
+  unique regardless of case (`Extrudr` and `extrudr` are the same supplier)
+  and cannot contain `;`, which separates names in the CSV. The list shows
+  how many spools reference each supplier, and a referenced supplier cannot
+  be deleted — remove or reassign its spool assignments first.
+- **Assigning on the spool**: the **Suppliers** section sits on the
+  **Color & Cost** tab of the spool dialog (so it is not shown in Quick
+  Add). Use **Add supplier…** to pick one from the list; typing a name that
+  does not exist yet offers **Create "…"**, so a missing supplier is added
+  without leaving the dialog. Each assignment is a row where you can record
+  the *supplier's* article number (their number for the product — not your
+  internal one) and a **quoted price per kg** there, so sources of the same
+  product compare at a glance. The quoted price is for comparison only — the
+  spool's own *Cost per kg* stays the cost basis for print costing and is
+  never overwritten by an assignment.
+- **Bought here**: tick this on the supplier this concrete spool was actually
+  purchased from. The other assignments read as alternative sources. At most
+  one assignment can carry the marker; leaving it unticked everywhere is
+  fine.
+- **Inheritance**: a new spool of a product that already carries supplier
+  assignments — same brand, material, subtype and colour — arrives with the
+  source list filled in, as long as you leave its supplier list untouched
+  when adding it. *Bought here* is not inherited, since where the new spool
+  was bought is not something Bambuddy can know. This covers manual adds,
+  bulk adds (every copy gets the same list), the API, and RFID auto-added
+  refills. **Copying** a spool takes the suppliers of the spool you copied,
+  again without *Bought here*.
+- **Deleting and archiving**: deleting a spool removes its assignments, so
+  its suppliers become deletable again. Archiving keeps them — an archived
+  spool still records where it was bought.
+- **List & search**: an optional sortable *Suppliers* column (purchase
+  source highlighted first), a supplier filter in the filter bar (including
+  *No supplier*), and the free-text search matches supplier names and their
+  article numbers.
+- **Statistics**: the Statistics page gains a
+  [By Supplier](statistics.md#by-supplier) widget — spools, remaining stock,
+  consumption and cost grouped by the *Bought here* supplier. Consumption
+  and cost follow the dashboard's date range; stock is always the current
+  state. Cost aggregates the recorded usage history (based on each spool's
+  *Cost per kg*), never the quoted prices.
+- **CSV & API**: the inventory CSV carries two columns, `suppliers` and
+  `purchase_supplier` — see the [CSV schema](#csv-schema) for how they are
+  matched on import. The REST API exposes `/api/v1/inventory/suppliers` for
+  the list and embeds assignments in the spool responses.
+
+!!! note "Spoolman mode"
+    The supplier list, the toolbar button and the section in the spool
+    dialog are the same in Spoolman mode. The assignments are stored on the
+    Bambuddy side (keyed by the Spoolman spool id), because Spoolman's
+    `vendor` is the manufacturer (it maps to Bambuddy's **Brand**), not the
+    seller — forcing suppliers into it would corrupt that field. Three things
+    differ:
+
+    - **No inheritance** — a new Spoolman spool starts without suppliers,
+      unless you copy an existing one.
+    - **No By Supplier widget** — it groups Bambuddy's own spools, not the
+      Spoolman-side assignments, so it is hidden on the Statistics page.
+    - **No CSV** — import and export are disabled in Spoolman mode, as for
+      the rest of the inventory.
+
+    A spool deleted directly in Spoolman leaves its assignments behind in
+    Bambuddy. They are cleared the next time you try to delete one of its
+    suppliers, provided Spoolman is reachable at that moment.
+
+!!! note "Permissions"
+    Suppliers use the regular inventory permissions, exactly like storage
+    locations: anyone who can read the inventory sees the list, anyone who
+    can edit the inventory manages it. No new permissions are introduced.
+
+---
+
+## :material-identifier: Material Numbers
+
+If your business purchases and costs filament by an internal article number
+(e.g. *15* = Bambu Lab PLA Basic, *16* = Bambu Lab ABS-GF), the **Material
+No.** field puts that identifier on the spool record itself
+([#2870](https://github.com/maziggy/bambuddy/issues/2870)) — unlike the
+free-text note it is sortable, filterable and usable as a statistics group.
+It is *your* number for the product; the article number on a
+[supplier assignment](#suppliers) is the supplier's number for it, and the
+two are independent.
+
+- **Where to set it**: in the spool dialog next to *Cost per kg* and
+  *Category* (with autocomplete from numbers already in use), or via
+  **Bulk Edit** to number an existing inventory in one pass. Surrounding
+  spaces are trimmed and a blank value means *no number*, so `15` and
+  `15 ` can never become two groups.
+- **Inheritance**: a new spool of an already-numbered product — same
+  brand, material, subtype and colour — arrives with the number filled in
+  automatically. That covers manual adds, bulk adds, the API, and spools
+  created by the RFID auto-add when a new refill is scanned. A blank field
+  on a new spool of such a product therefore always inherits: to keep one
+  spool deliberately unnumbered, clear its number after adding it. If
+  spools of the same product carry different numbers, the most recently
+  updated one is used; bulk-edit them to one number to avoid surprises.
+  **CSV import does not inherit** — the file is authoritative, so a row
+  without a number imports without one.
+- **List & search**: an optional sortable *Material No.* column (enable it
+  in the column chooser; numbers sort numerically, `2` before `15`), a
+  filter chip ("everything with number 15", including a *No material
+  number* option), and the free-text search also matches the number.
+- **Statistics**: the Statistics page gains a
+  [By Material Number](statistics.md#by-material-number) widget — spool
+  count, remaining stock, consumed grams and cost per number. Consumption
+  and cost follow the dashboard's date range and come from the recorded
+  usage history (archived spools included); stock is always the current
+  state.
+- **Backup & CSV**: the number is part of the GitHub backup and restore,
+  and of the inventory CSV as the `material_number` column — see the
+  [CSV schema](#csv-schema).
+
+!!! note "Spoolman mode"
+    In Spoolman mode the number is read from Spoolman's own filament-level
+    `article_number` and shown read-only — maintain it in Spoolman itself.
+    The field is not shown in the spool dialog or in Bulk Edit, the
+    By Material Number widget is hidden (it groups Bambuddy's own spools),
+    and CSV import and export are disabled as for the rest of the inventory.
+
+---
+
 ## :octicons-graph-16: Inventory Forecast
 
 See inventory depletion rates based on material usage and handle stock logistics.
@@ -481,7 +634,7 @@ See inventory depletion rates based on material usage and handle stock logistics
 
 The Forecast view shows all Inventory spools. Identical spool types are grouped together. 
 
-Each rown can be expanded to show additional settings, data, and actions.
+Each row can be expanded to show additional settings, data, and actions.
 
 | Setting | Description |
 |---------|-------------|
@@ -493,8 +646,8 @@ Each rown can be expanded to show additional settings, data, and actions.
 
 The user can set a **Global Lead Time** that will override all lower lead times (or lead times that are not set).
 
-The interface will alert of any stock breakage forecasted. These can also be sent via the notification service by enabling them in **Settings → Notifications**.
-To exclude spools from forecasting and alert logging, click the Snooze icon in item row.
+The interface will alert of any stock breakage forecasted. These can also be sent via the notification service by enabling **Reorder Alert** and **Stock Break Alert** on a provider in **Settings → Notifications**; see [Inventory Events](notifications.md#inventory-events) for when they fire.
+To stop the alerts for a SKU, click the Snooze icon in its row.
 
 !!! tip "Set Lead Time on Your Spools"
     For the most accurate tracking, set Lead Time on each spool group.
@@ -539,22 +692,36 @@ In the **Logistics** view a graph shows predicted stock variations based on reor
 
 ## :material-printer: Printable Labels
 
-Bambuddy can generate PDF labels for any selection of spools. The label carries the colour swatch (with multi-colour gradient stripes for spools that have extra colours), brand, material, name, the spool ID, and a QR code that deep-links straight back to that spool's row in Bambuddy when scanned with a phone — useful for finding the right spool in storage.
+Bambuddy can generate labels for any selection of spools, as a PDF or as PNG images. A label carries the colour swatch (with multi-colour gradient stripes for spools that have extra colours), and you choose which lines go with it: brand, material, name, storage location, temperatures, weight and more, the spool ID, and a QR code that deep-links straight back to that spool's row in Bambuddy when scanned with a phone — useful for finding the right spool in storage.
 
-### Two ways to start
+### Ways to start
 
 - **Per-spool icon** — every spool card and table row has a small printer icon. Click it to print just that one spool's label.
-- **Header bulk button** — *Print labels…* in the inventory page header opens the picker pre-selected with every spool currently visible (i.e. matching your filters). Refine the selection in the modal.
+- **Header button** — *Print labels…* in the inventory page header. With spools ticked in the list, the picker opens with those selected; with none ticked, it opens with every spool currently visible (i.e. matching your filters). Refine the selection in the modal.
+- **Selection bar** — tick spools in the list and click **Print labels** in the bar that appears.
 
 ### The picker
 
-The modal lists the spools you can choose from with checkboxes. From the top:
+The left side lists the spools you can choose from with checkboxes:
 
 - **Search** — substring match across name, brand, and `#ID` (e.g. type `#42` to jump to spool 42).
 - **Material chips** — narrow the visible list to a single material (PLA, PETG, …). Chips are derived from your library so you only see what you actually have.
+- **Sort** — by ID or by colour. Labels print in the order shown, so *By colour* gives you a sheet that reads as a rainbow.
 - **Select all visible / Deselect visible / Clear all** — additive selection actions. *Select all visible* adds the currently filtered list to your selection without dropping anything you'd already picked outside the filter; *Clear all* wipes the entire selection. This means you can build a selection across filters: filter to PLA, click *Select all visible*, switch to PETG, click *Select all visible* again — both groups are now selected.
 - **Live "X selected" count** in the modal title so you always know what you're about to print.
-- **Starting label position** — the number field below the list, beside **Monochrome**. Choose the first unused position when printing an Avery sheet; position 1 remains the default, and single-label templates ignore it.
+
+The right side is the label itself:
+
+- **Label size** — the template (see below).
+- **Preview** — the first selected spool's label, exactly as it will print, updated as you change the options.
+- **Print on the label** — tick the lines you want. **Reset to default** goes back to the standard set.
+- **Monochrome (black & white printer)** — see the tip below.
+- **Starting label position** — shown for Avery sheets only (see below).
+- **Output** — **PDF** or **PNG**, and for PNG the resolution.
+
+Then click **Create PDF** or **Download PNG**.
+
+The picker remembers the label size, the lines ticked for each size, monochrome and the output settings in your browser, so the next batch comes out the same. The lines are remembered per size because a 40 × 30 mm roll label and an A4 sheet hold different amounts.
 
 ### Template sizes
 
@@ -562,8 +729,10 @@ Pick the template that matches your label stock or holder:
 
 | Template | Size | Per page | Best for |
 |---|---|---|---|
-| **AMS holder** | 30 × 15 mm | 1 | The popular [Makerworld AMS Filament Label Holder](https://makerworld.com/en/models/752566) (model 752566). Compact identification at-a-glance. |
-| **Box label** | 62 × 29 mm | 1 | Brother PT/QL or Dymo small labels. Carries name, brand, material, storage location, and a QR code. |
+| **AMS holder — small** | 74 × 33 mm | 1 | The printable label from the [Makerworld AMS Filament Label Holder](https://makerworld.com/en/models/752566) (model 752566). |
+| **AMS holder — large** | 75 × 55 mm | 1 | The cardstock-insert variant of the same holder. The roomiest template. |
+| **Box label** | 40 × 30 mm | 1 | Common DK/Brother roll size; filament bags and storage bins. |
+| **Box label** | 62 × 29 mm | 1 | Brother PT/QL or Dymo small labels. |
 | **Avery L7160** | 38.1 × 63.5 mm | 21 | EU sheet stock — A4 paper, 21 labels per sheet (3 columns × 7 rows). |
 | **Avery 5160** | 25.4 × 66.7 mm | 30 | US sheet stock — Letter paper, 30 labels per sheet (3 columns × 10 rows). |
 
@@ -575,23 +744,39 @@ Use **Starting label position** to leave used positions blank on the first sheet
 
 1. Count the positions from left to right and top to bottom, beginning with 1 in the upper-left corner.
 2. Enter the first unused position: **1–21** for Avery L7160 or **1–30** for Avery 5160.
-3. Choose the matching Avery template to generate the PDF.
+3. Click **Create PDF** (or **Download PNG**).
 
 For example, starting at position 8 leaves positions 1 through 7 blank and places the first selected spool at position 8. Labels continue in reading order. If the selection fills the remaining positions on the first sheet, every later page begins at position 1.
 
 The position is not remembered. The picker opens at 1 every time, so set it again each time you come back to a part-used sheet — Bambuddy has no way of knowing which labels you have peeled off since the last batch.
 
 !!! note "Sheet templates only"
-    Starting position applies only to Avery L7160 and Avery 5160 sheets. Roll and single-label templates always begin at their normal position. Enter a number a sheet cannot hold — 25 on an L7160, say — and that sheet's own button is disabled and shows its range in place of the usual hint, while the sheet that *can* hold it stays available.
+    The field only appears for the Avery L7160 and Avery 5160 sheets. Enter a number the chosen sheet cannot hold — 25 on an L7160, say — and the field shows the sheet's range and the print button stays disabled until you fix it.
 
 ### What's on each label
 
-- **Colour swatch** — the spool's `rgba`. Spools with multi-colour stops (`extra_colors`) render as vertical stripes in the order you saved them.
-- **Brand · material · subtype** — small text row.
-- **Spool name** — bold; what you set in the spool form.
-- **Storage location** — italic, only on the box-label and Avery templates (the AMS holder is too small).
-- **Spool ID** — large bold `#N`, anchored at the bottom-left. This is the killer field for telling 8 spools of "PLA White" apart in your closet, especially partials.
-- **QR code** — links to `/inventory?spool=<id>` so a phone scan jumps straight to the spool's row in Bambuddy. The AMS-holder template skips the QR (no room at 30 × 15 mm) — the spool ID and swatch are enough at AMS-bay distance.
+The colour swatch is always on the label (unless you print in monochrome) — the spool's `rgba`, with multi-colour stops (`extra_colors`) as vertical stripes in the order you saved them. Everything else is your choice:
+
+| Line | Printed as | On by default |
+|---|---|---|
+| **Brand** | bold, at the top | yes |
+| **Material and subtype** | `PLA · Matte` | yes |
+| **Colour code** | `#E8F0E0` — tells near-identical colours apart, and carries the colour in monochrome | yes |
+| **Colour or filament name** | bold; the colour name, or the filament/slicer name when the spool has none | yes |
+| **Storage location** | italic | yes |
+| **Material number** | the spool's material number (in Spoolman mode, the filament's article number) | no |
+| **Nozzle temperature** | `190–230 °C`, from the spool's temperature settings (in Spoolman mode, the filament's extruder temperature) | no |
+| **Net weight** | `1000 g`, the label weight | no |
+| **Note** | italic; in Spoolman mode, the spool's comment | no |
+| **Date added** | `2026-09-30` | no |
+| **QR code** | on the right; links to `/inventory?spool=<id>` so a phone scan jumps straight to the spool's row in Bambuddy | yes |
+| **Spool ID** | large bold `#N` at the bottom. This is the killer field for telling 8 spools of "PLA White" apart in your closet, especially partials | yes |
+
+The lines print top to bottom in the order of this table. The label carries values only — numbers, units, dates — and no words, so it reads the same in every language.
+
+A line that doesn't fit on the chosen size is left out rather than printed over the spool ID; the preview shows which ones made it. Unticking the QR code gives its space to the text. The name line is skipped when it would only repeat the brand or the subtype.
+
+Built-in inventory and Spoolman labels are built from the same fields, so a spool prints the same in both modes.
 
 !!! tip "Low-resolution / thermal label printers"
     The QR is tuned to stay scannable on cheap 203 dpi thermal printers, including on the small 40 × 30 mm box label where earlier builds rendered it too densely and the lines bled together. If you print to a **black-and-white** thermal printer, tick **Monochrome (black & white printer)** in the print dialog — it drops the colour swatch (which prints as a meaningless grey block) and gives that space to the text; the colour is still shown as the hex code line.
@@ -600,9 +785,10 @@ The position is not remembered. The picker opens at 1 every time, so set it agai
 
 The QR encodes the URL Bambuddy can be reached at + `/inventory?spool=<id>`. By default this is the request's own scheme + host (`https://bambuddy.your-server.local/inventory?spool=42`) — if you set **Settings → External URL** to your public Bambuddy address, the QR uses that instead, so a phone outside your LAN can still resolve it.
 
-### Print or save
+### PDF or PNG
 
-The PDF opens in a new browser tab. From there you can either print directly to a label printer / sheet of blanks, or save the PDF and print later. Since rendering is server-side via [ReportLab](https://docs.reportlab.com/), the output is byte-identical across browsers — no "Chrome prints differently than Firefox" surprises.
+- **PDF** opens in a new browser tab. From there you can either print directly to a label printer / sheet of blanks, or save the PDF and print later. Since rendering is server-side via [ReportLab](https://docs.reportlab.com/), the output is byte-identical across browsers — no "Chrome prints differently than Firefox" surprises.
+- **PNG** is for label printer software that takes images, such as Brother P-touch Editor. Pick the resolution that matches your printer — **203 dpi** or **300 dpi** for most thermal label printers, **600 dpi** for high-resolution ones — so the image prints dot for dot, with a sharp QR code. The PNG carries its resolution, so it prints at the label's real size. One label downloads as a single PNG; several download as a ZIP with one PNG per label (`label-<id>.png`), or one per page for Avery sheets (`sheet-<n>.png`).
 
 ### Limits
 
@@ -667,6 +853,9 @@ The header is fixed but **case- and space-tolerant** — `Color Name`, `color-na
 | `storage_location` | | Where the spool is stored (e.g. `Shelf A`). Round-trips on export/import. |
 | `category` | | User-defined category (e.g. `Production`, `Prototype`). Round-trips on export/import. |
 | `low_stock_threshold_pct` | | Per-spool low-stock threshold, `1`–`99` (%). Blank falls back to the global setting. |
+| `material_number` | | Your internal [material number](#material-numbers), up to 64 characters, trimmed. Round-trips on export/import. Import does not inherit it — a blank cell leaves the spool without a number. |
+| `suppliers` | | All assigned [suppliers](#suppliers), separated by `;` (e.g. `Extrudr; Filament24`). Matched against your existing supplier list by name, trimmed and case-insensitive. Import **never creates suppliers**: an unknown name is a warning in the preview, that assignment is dropped and the row still imports. |
+| `purchase_supplier` | | The *Bought here* supplier, or blank. Matched the same way; it counts as an assignment even if the `suppliers` cell leaves it out. |
 
 !!! note "`remaining` is display-only"
     Remaining weight is always derived from `label_weight − weight_used`, so it's exported for readability but ignored on import. `weight_used` is the single source of truth — set that to control how full a spool is.
@@ -828,7 +1017,7 @@ Assigning a spool is the simplest workflow — it handles both tracking and prin
     For the most accurate remaining weight, weigh the full spool on a kitchen scale and subtract the empty spool weight. Enter this as the remaining weight when adding a new spool.
 
 !!! tip "Low Stock Alerts"
-    Keep an eye on the "Low Stock" summary card. Spools below 20% remaining are flagged so you can reorder before running out.
+    Keep an eye on the "Low Stock" summary card. Spools below 20% remaining are flagged so you can reorder before running out. To be told instead, enable the **Low Filament** event on a [notification provider](notifications.md#printer-events); it covers spools assigned to a slot.
 
 !!! tip "PA Profiles"
     Link K-factor profiles to your spools so the correct pressure advance settings are always associated with each filament.

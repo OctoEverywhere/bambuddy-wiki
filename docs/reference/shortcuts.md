@@ -43,6 +43,21 @@ Available from any page:
 
 ---
 
+## :material-view-column: File Manager — Column View
+
+| Shortcut | Action |
+|:--------:|--------|
+| ++arrow-up++ ++arrow-down++ | Move within the current column, past its last folder into its files and back |
+| ++arrow-right++ / ++enter++ | Open the selected folder's first subfolder, then move into its files |
+| ++arrow-left++ | Go up one level, or leave the file list |
+| ++enter++ | Open the focused file's preview |
+| ++space++ | Select or deselect the focused file |
+| Menu key / ++shift+f10++ | Jump into the focused file's actions, or open the selected folder's menu |
+
+See [Column View](../features/file-manager.md#column-view) for the details.
+
+---
+
 ## :material-dialog: Modals & Dialogs
 
 | Shortcut | Action |

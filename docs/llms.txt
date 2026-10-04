@@ -29,6 +29,7 @@ This wiki covers installation, every feature in detail, the optional SpoolBuddy 
 - [Archive comparison](https://wiki.bambuddy.cool/features/comparison/): Side-by-side comparison of similar prints.
 - [Server-side slicing](https://wiki.bambuddy.cool/features/slicer-api/): OrcaSlicer or Bambu Studio sidecar — slice STL or 3MF to printable G-code from any browser, no desktop slicer needed.
 - [MakerWorld integration](https://wiki.bambuddy.cool/features/makerworld/): Browse and import models from MakerWorld.com directly.
+- [Manyfold integration](https://wiki.bambuddy.cool/features/manyfold/): Browse and search a self-hosted Manyfold library and import its files.
 - [File manager](https://wiki.bambuddy.cool/features/file-manager/): G-code library with folder organization, trash bin, auto-purge.
 
 ## Spool inventory

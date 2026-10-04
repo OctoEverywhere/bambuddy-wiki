@@ -18,7 +18,7 @@ imported, and standard bundled presets.
 
 Orca Cloud Profiles lets you:
 
-- **Sign in** to your Orca Cloud account from Bambuddy (four providers)
+- **Connect** your Orca Cloud account to Bambuddy by approving a pairing code
 - **View** all profiles your Orca account has synced — filament, process, printer
 - **Slice** with Orca profiles directly from the Bambuddy SliceModal
 - **Assign** an Orca filament profile to an AMS slot from the Configure modal
@@ -26,41 +26,26 @@ Orca Cloud Profiles lets you:
 
 The integration is read-only on the Orca Cloud side — Bambuddy lists and uses your profiles but doesn't create, edit, or delete them. Make changes in OrcaSlicer itself; refresh the tab in Bambuddy to pick them up.
 
+!!! note "Only your own presets are in Orca Cloud"
+    OrcaSlicer uploads presets you created or saved yourself. Ticking a built-in filament, such as *Elegoo PLA* or *PolyLite PLA*, in OrcaSlicer's filament list only shows it in your own OrcaSlicer, so it never reaches Orca Cloud or this tab. You don't need it there: with the OrcaSlicer sidecar, Bambuddy lists OrcaSlicer's built-in filaments in the **Standard** tier of the Slice dialog. To use your own changes to one, select it in OrcaSlicer and **Save as** a preset of your own; that copy syncs.
+
 ---
 
 ## :material-key: Connecting
 
-### Sign-in providers
+### Pairing with Orca Cloud
 
-Bambuddy offers four ways to sign in:
-
-| Provider | Flow |
-|----------|------|
-| **Email + password** *(default)* | Submit credentials directly to Orca's auth backend; no browser redirect |
-| **Google** | Browser-based OAuth via Orca's Supabase auth |
-| **GitHub** | Browser-based OAuth via Orca's Supabase auth |
-| **Apple** | Browser-based OAuth via Orca's Supabase auth |
-
-### Email + password sign-in
+Bambuddy connects to Orca Cloud by **approving a pairing code**. There is no password to enter in Bambuddy and no redirect URL to copy.
 
 1. Open **Profiles** → **Orca Cloud** tab
-2. Click **Sign in with email and password** (the primary button)
-3. Enter your Orca account credentials
-4. Click **Sign in**
+2. Click **Connect Orca Cloud**
+3. Bambuddy shows a short **pairing code**. Click **Open Orca Cloud approval page**, or go to the address shown under the code and enter it there
+4. Sign in to Orca Cloud in that tab if asked, and approve the code
+5. Bambuddy connects on its own as soon as you approve. The dialog shows *Waiting for you to approve…* until then
 
-That's it — no paste step, no browser redirect.
+The code expires after 10 minutes. If it does, or if the pairing was denied, click **Connect Orca Cloud** again for a new one.
 
-### OAuth sign-in (Google / GitHub / Apple)
-
-1. Open **Profiles** → **Orca Cloud** tab
-2. Click the provider you want
-3. A new tab opens at Orca's sign-in page — complete authentication there
-4. Your browser will try to load a `localhost:41172/callback` URL and show *"This site can't be reached"* — **that's expected**, not an error
-5. Copy the full URL from your browser's address bar
-6. Paste it into the textarea in Bambuddy and click **Finish connecting**
-
-!!! warning "The localhost page failing IS the expected state"
-    Orca Cloud's Supabase project only allows `localhost` as an OAuth callback target. Bambuddy isn't running on your browser's localhost, so the redirect can't reach Bambuddy directly — you ferry the URL across manually. This is the same friction OrcaSlicer's own desktop client navigates internally, just exposed to you in Bambuddy's case. The open feature request to broaden the allowlist is at [OrcaSlicer/OrcaSlicer#14028](https://github.com/OrcaSlicer/OrcaSlicer/issues/14028).
+Bambuddy asks for **read-only** access: it lists and views your profiles and nothing more. The pairing stays valid without signing in again, and it works the same whether you reach Bambuddy by LAN IP, `localhost` or through a reverse proxy. **Disconnect** on the tab ends it.
 
 ### After signing in
 
@@ -98,7 +83,9 @@ For **multi-color** prints, the per-plate filament pre-pick benefits from Orca C
 
 ## :material-printer-3d-nozzle: AMS slot assignment
 
-The **Configure AMS Slot** modal (both from the printer card and from SpoolBuddy) cannot send Orca's own profile ID to the printer — it is a 36-character UUID and the printer's filament field holds eight characters. Bambuddy instead reads the profile's own `filament_id` out of its slicer JSON, which is the same eight-character `P…` the printer stores for any custom filament, and uses that for the slot's `tray_info_idx`. Profiles that carry no `filament_id` of their own fall back to the generic Bambu ID for the parsed material type (PLA → GFL99, PETG → GFG99, ABS → GFB99, etc.), which is why such a slot reads as *Generic* on the printer — see [Why the printer may still show a generic filament](ams.md#custom-preset-display). The slot mapping record is persisted with `preset_source='orca_cloud'` so Bambuddy can display the right profile name on hover and surface the right one on subsequent opens.
+The **Configure AMS Slot** dialog (both from the printer card and from SpoolBuddy) cannot send Orca's own profile ID to the printer. That ID is a 36-character UUID, and the printer's filament field holds eight characters. Instead, Bambuddy reads the profile's own `filament_id` from its slicer JSON and puts that in the slot's `tray_info_idx`. This is the eight-character `P…` ID that OrcaSlicer's Device tab also writes, and it is the only thing OrcaSlicer's **Sync filaments** uses to find your profile again. The lookup runs on the Bambuddy server when you configure the slot, and its result is written to the log.
+
+A profile that only stores its changes against another profile has no `filament_id` of its own. Bambuddy then takes the ID from the profile it inherits from: either another of your Orca Cloud profiles, or the Bambu filament it was copied from (for example `GFA00` for *Bambu PLA Basic*). If no ID can be found, or Orca Cloud can't be reached, the slot gets the generic Bambu ID for the material instead (PLA → GFL99, PETG → GFG99, ABS → GFB99, and so on). The dialog then shows a warning that OrcaSlicer will see the slot as *Generic*. See [Why the printer may still show a generic filament](ams.md#custom-preset-display). Bambuddy remembers the profile you picked for the slot, so it can show the right name on hover and preselect it the next time you open the dialog. Once the slot is changed somewhere else, such as OrcaSlicer's Device tab or the printer's screen, Bambuddy stops showing that profile.
 
 ---
 

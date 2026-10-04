@@ -112,6 +112,30 @@ External links display with:
 - Name
 - External indicator (if opens new tab)
 
+### Matching Bambuddy's Theme
+
+A link that opens inside Bambuddy tells the page it shows which theme is active. An app built for the sidebar can use this to switch to light or dark and follow your background, style and accent colour.
+
+Bambuddy sends the theme with `postMessage`, only to the link's own origin:
+
+```json
+{"type": "bambuddy:theme", "mode": "dark", "style": "vibrant", "background": "cool", "accent": "green", "canNavigate": true}
+```
+
+It sends it when the page loads, whenever you change the theme, and when the page asks by posting `{"type": "bambuddy:theme-request"}` to its parent. The page should check that the message's origin is your Bambuddy address. Pages that don't listen are unaffected.
+
+### Opening a Bambuddy Page from the App
+
+The frame a link opens in can't navigate the Bambuddy window itself, so a plain link from the app to a Bambuddy page does nothing when clicked. The app can ask Bambuddy instead, by posting this to its parent:
+
+```json
+{"type": "bambuddy:navigate", "path": "/queue?batch=12"}
+```
+
+Bambuddy then opens that page, as if you had used its own menu. It accepts the request only from the frame, only from the link's own origin, and only for a path inside Bambuddy (starting with `/`). Anything else, such as another site, is ignored.
+
+`canNavigate: true` in the theme message means this Bambuddy takes such requests. Older versions don't send it; an app should open a new tab there instead.
+
 ---
 
 ## :material-lightbulb: Use Cases

@@ -289,6 +289,9 @@ Each value (power, energy) can use its own URL or fall back to the shared Status
 | **Energy JSON Path (lifetime)** | Path to a **cumulative** counter that never resets | `aenergy.total` |
 | **Lifetime Multiplier** | Multiply raw value (default `1`) | `0.001` to convert Wh → kWh |
 
+!!! tip "Plugs that count in watt-seconds"
+    Some plugs, such as the myStrom Switch, report energy in watt-seconds (Ws). Use a multiplier of `0.000000277778` (1 ÷ 3,600,000) to convert Ws → kWh. Any multiplier above zero is accepted.
+
 !!! warning "Today and lifetime are different counters — don't mix them up"
     This is the single most common REST misconfiguration.
 

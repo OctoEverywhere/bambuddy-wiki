@@ -109,7 +109,8 @@ restore, firmware installs). The ten toggles you can set on a key are:
 | **Manage Archives** | Edit and delete print archives (`DELETE /archives/{id}`), including the `?purge_stats=true` option on that route which also drops the row from Quick Stats. Suits automations that prune the print history. Reprinting an archive stays under **Manage Queue**; the standalone bulk-purge operation stays admin-only. |
 | **Manage Projects** | Create, update and delete projects, and manage their membership (adding archives to a project). Suits automations that file finished prints into projects. Reading projects comes with **Read Status**. |
 | **Allow Cloud Access** | Read the owner's Bambu Cloud presets/filaments via `/cloud/*` (see below) |
-| **Update Electricity Price** | Push a new per-kWh tariff to `POST /settings/electricity-price` (see [Energy Tracking](energy.md#dynamic-electricity-price-from-home-assistant)) — narrowly scoped, the only settings field writable via API key |
+| **Update Electricity Price** | Push a new per-kWh tariff to `POST /settings/electricity-price` (see [Energy Tracking](energy.md#push-the-price-from-home-assistant)) — narrowly scoped, the only settings field writable via API key |
+| **Send Notifications** | Send a message through the notification channels that have **Messages from connected apps** on (`POST /notifications/app-message`, see [Notifications](notifications.md#messages-from-connected-apps)). For apps like Bambuddy Orders. Nothing else: the key can't read or change the channels. The key's owner needs the **notifications:update** permission |
 
 !!! warning "Allowlist model since 0.2.4.5 (GHSA-r2qv-8222-hqg3)"
     Earlier Bambuddy versions gated API keys via a small denylist of
@@ -149,6 +150,9 @@ restore, firmware installs). The ten toggles you can set on a key are:
     user who created it, and is limited to the permissions **that user** holds
     through their groups — ticking **Control Printer** on a key created by
     someone who may not control printers does not give the key that ability.
+    The same goes for printers: a key reaches only printers its owner may see
+    (see [Printer Access](authentication.md#printer-access)), and a printer it
+    can't reach answers `404 Not Found`, as if it didn't exist.
     Deactivating or deleting a user disables their keys along with their login.
 
     Two consequences worth planning around:
@@ -342,6 +346,48 @@ http://your-server:8000/api/v1
 | `/pipeline-runs` | GET | List pipeline runs |
 | `/users/slim` | GET | Resolve user ids to names (id + username only) |
 | `/auth/me` | GET | Identify the key: its owner and the scopes it actually carries |
+| `/webhook/printer/{id}/status` | GET | Compact printer status for polling clients (see below) |
+
+### Compact printer status
+
+`GET /webhook/printer/{id}/status` needs **Read Status**, and a key limited to
+certain printers only reaches those. It returns the few fields a phone widget
+or Live Activity polls for, in one small response:
+
+```json
+{
+  "id": 1,
+  "name": "Workshop H2C",
+  "serial_number": "0948AD000000001",
+  "connected": true,
+  "state": "PAUSE",
+  "current_print": "Articulated Dragon",
+  "progress": 62.0,
+  "remaining_time": 107,
+  "remaining_seconds": 6420,
+  "layer_num": 88,
+  "total_layers": 240,
+  "subtask_id": "512345678",
+  "hms_errors": [
+    {
+      "code": "0x20008",
+      "attr": 117473280,
+      "module": 7,
+      "severity": 2,
+      "actions": ["RESUME_PRINTING"],
+      "job_id": "512345678",
+      "full_code": "0700800000020008",
+      "description": "Filament has run out."
+    }
+  ]
+}
+```
+
+- `remaining_time` is in **minutes**, as the printer reports it. `remaining_seconds` is the same estimate in seconds, the unit notifications use.
+- `subtask_id` is the printer's id for the running job. A new value means a new print, even when two prints of the same file run back to back between two polls. It is `null` when the job has no id: Bambu gives none to some local prints, such as one started on the printer itself.
+- `hms_errors` is the printer's live HMS list, in the same shape as `GET /printers/{id}/status`. It includes notices as well as faults; the [API reference](../reference/api.md) explains which entries Bambuddy's own UI counts as a fault. It is what tells a filament runout apart from someone pressing pause.
+- `serial_number` identifies the printer by what it reports itself, rather than by Bambuddy's id.
+- Until Bambuddy has heard from the printer, `connected` is `false` and the live fields are `null`. A connected, idle printer reports `0` for the counters.
 
 !!! note "Turning `created_by_id` into a name"
     Archives, the queue and the statistics endpoints all report ownership as a

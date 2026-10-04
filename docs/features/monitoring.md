@@ -216,8 +216,8 @@ In compact (Small) view, each printer card shows a small colored status pip:
 | Color | Meaning |
 |:-----:|---------|
 | :material-circle:{ style="color: #4caf50" } Green | Connected, no issues |
-| :material-circle:{ style="color: #f44336" } Red | Offline, or fatal/serious HMS error (severity ≤ 2) |
-| :material-circle:{ style="color: #ff9800" } Amber | HMS warning (common/info severity) |
+| :material-circle:{ style="color: #f44336" } Red | Offline, or an HMS fault that stops or pauses the print (level **Error** or **Warning**) |
+| :material-circle:{ style="color: #ff9800" } Amber | Only HMS faults that don't stop the print (level **Notice**, or a level the printer didn't set) |
 
 Hover over the pip to see the number of active HMS errors.
 
@@ -287,20 +287,28 @@ The HMS indicator is always visible on printer cards:
 
 | Status | Meaning | Action |
 |:------:|---------|--------|
-| :material-check-circle:{ style="color: #4caf50" } **OK** | No issues detected | None needed |
-| :material-alert:{ style="color: #ff9800" } **Warning** | Minor issues or warnings | Check when convenient |
-| :material-alert-circle:{ style="color: #ff5722" } **Error** | Serious errors | Address before next print |
-| :material-close-circle:{ style="color: #f44336" } **Fatal** | Fatal errors | Immediate attention needed |
+| :material-check-circle:{ style="color: #4caf50" } **OK** | No faults that count | None needed |
+| :material-alert:{ style="color: #ff9800" } Amber, with a count | Only **Notice**-level faults that count, such as a prompt waiting for you; the print carries on | Check when convenient |
+| :material-alert-circle:{ style="color: #f44336" } Red, with a count | At least one **Error** (the print was stopped) or **Warning** (the print is paused) | Needs attention |
+
+The levels are the ones the printer itself reports, the same ones Bambu Studio and Bambu Handy use.
 
 ### Error Details
 
 Click the HMS indicator to see:
 
-- Human-readable error description (853 codes translated)
-- Error code for reference
-- Affected component
-- Recommended action
-- Link to Bambu Lab support article
+- The description Bambu publishes for the fault, for your printer model. The texts come from Bambu Studio's own HMS files and cover about 6,400 codes. They are in English.
+- The code as the printer screen shows it, such as `0500-0300-0002-000E`
+- Its level: **Error**, **Warning** or **Notice**
+- The action buttons Bambu offers for it, if any (below)
+- A link to Bambu Lab's HMS wiki
+
+Two kinds of fault don't count toward the indicator, the printer card's problem badge or the Camera Wall, and don't send notifications:
+
+- **Notices that don't need you.** Level-**Notice** faults from the printer's HMS list with no action buttons, such as "The top cover is open" or "The chamber temperature is high, and the system has increased the fan speed". A printer can hold these through a whole print.
+- **Codes without published text.** Bambu lists a few codes with an empty description, and some aren't listed at all.
+
+The modal still lists them, with their text where Bambu has one, collapsed under **Also reported, not counted**, so nothing the printer is holding is hidden. A fault that offers action buttons always counts, so its buttons show.
 
 ### Error Actions (Resume / Stop / Check Assistant / …)
 
@@ -318,7 +326,7 @@ Click any button and Bambuddy sends the matching MQTT command back to the printe
 
 After a button click Bambuddy waits up to 2.5 s for the printer to push at least one MQTT status update; if no push arrives the action is reported as **`Printer did not acknowledge HMS action`** rather than a silent success. This catches firmware-side silent rejection (broker ACKs the publish but the printer drops the command — e.g. an err format mismatch).
 
-Which buttons appear is determined by the printer model (`X1C`, `P1S`, `A1`, `H2D`, …) and the error code via Bambu's published HMS catalog. If Bambu's catalog has no entry for a code, the modal shows only the error description and the "Clear Errors" fallback.
+Which buttons appear is determined by the printer model (`X1C`, `P1S`, `A1`, `H2D`, …) and the error code via Bambu's published HMS catalog. If Bambu's catalog has no actions for a code, the modal shows only the error description and the "Clear Errors" fallback.
 
 Action labels are translated in all 13 supported locales (English, German, Spanish, French, Italian, Japanese, Korean, Portuguese (Brazil), Russian, Turkish, Ukrainian, Simplified Chinese, Traditional Chinese).
 
@@ -331,7 +339,7 @@ The HMS error modal also includes a **Clear Errors** button at the bottom that:
 
 1. Sends a `clean_print_error` command to the printer via MQTT
 2. Immediately removes errors from the Bambuddy UI
-3. Only appears when there are active errors
+3. Appears whenever the printer is holding any fault, including ones listed without a description
 
 This is useful for dismissing stale `print_error` values that persist after print cancellation or transient events (without needing to power-cycle the printer or start a new print). The per-error action buttons (above) handle the common cases — Clear Errors is the catch-all for older codes that have no action mapping.
 

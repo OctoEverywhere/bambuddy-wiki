@@ -85,8 +85,10 @@ See [Cloud Profiles](cloud-profiles.md#when-the-sign-in-expires).
 
 ## :material-cursor-default-click: How to use it
 
-1. Open **MakerWorld** from the sidebar (between *File Manager* and
-   *Notifications*).
+1. Open **Model Sources** from the sidebar and pick the **MakerWorld**
+   tab. (The entry was called *MakerWorld* until the
+   [Manyfold](manyfold.md) tab joined it; old `/makerworld` links still
+   open this tab.)
 2. Paste a MakerWorld URL into the input field and click **Resolve**.
 3. Review the model details — cover image, plate list with filament
    count, AMS requirement, per-plate images (click the cover for a

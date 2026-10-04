@@ -153,6 +153,7 @@ nav:
       - Notifications: features/notifications.md
     - Integrations:
       - MakerWorld: features/makerworld.md
+      - Manyfold: features/manyfold.md
       - Spool Inventory: features/inventory.md
       - Storage Locations: features/storage-locations.md
       - Spoolman: features/spoolman.md
@@ -170,6 +171,7 @@ nav:
     - Maintenance & Security:
       - Maintenance Tracker: features/maintenance.md
       - Firmware Updates: features/firmware-updates.md
+      - Announcements: features/announcements.md
       - File Manager: features/file-manager.md
       - Backup & Restore: features/backup.md
       - PostgreSQL Support: features/postgresql.md

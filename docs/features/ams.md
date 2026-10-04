@@ -115,7 +115,7 @@ So the three can legitimately disagree. A slot that reads as your custom preset 
 
 A custom preset only becomes a filament in its own right when it carries its own ID &mdash; a `P` followed by seven hex characters. Bambu Studio mints one when you create a genuinely new filament. It does **not** when the preset merely overrides a few fields of a generic base. An OrcaSlicer preset synced to *Bambu* Cloud has no such field at all; one synced to [Orca Cloud](orca-cloud-profiles.md) usually carries one, and Bambuddy reads it from there.
 
-With no ID of its own, there is nothing custom to send. Bambuddy leaves the slot on an ID that does resolve &mdash; the one the slot already had, or the generic for that material &mdash; so the printer's calibration table and the slicer's filament matching keep working. The name they show is that filament's, not your preset's. Bambuddy still sends the preset's full cloud ID alongside it, which is what lets Bambu Studio pick your settings up when it can.
+With no ID of its own, there is nothing custom to send. Bambuddy then puts an ID that does resolve in the slot, so the printer's calibration table and the slicer's filament matching keep working. For a Bambu Cloud preset, that is the ID the slot already had, or the generic for the material. For an Orca Cloud profile, it is the ID of the profile it inherits from, or the generic for the material, and the Configure dialog warns you when it had to use the generic. The name they show is that filament's, not your preset's. Bambuddy still sends the preset's full cloud ID alongside it, which is what lets Bambu Studio pick your settings up when it can.
 
 !!! note "Why not send the custom ID anyway?"
     Earlier versions did. The cloud ID is eighteen characters and the field holds eight, so the printer stored a truncated fragment, reported success, and ended up pointing at something that resolves nowhere &mdash; the slicer showed *Generic* **and** the slot lost its calibration entry. Fixed in 1.2.6b1; see [#3003](https://github.com/maziggy/bambuddy/issues/3003).
@@ -428,7 +428,7 @@ When the AMS encounters a power-related issue, the printer reports it as an HMS 
 4. Click **Start** (or **Schedule** for drying sessions scheduled for a future time).
 
 !!! tip "Filament Presets"
-    Temperature and duration defaults come from BambuStudio's official filament profiles. You can customize them in **Settings** > **AMS Display Thresholds** > **Drying Presets**. These presets are shared between manual drying, queue auto-drying, and ambient drying.
+    Temperature and duration defaults come from BambuStudio's official filament profiles. You can customize them in **Settings** > **Workflow** > **Queue Auto-Drying** > **Drying Presets**. These presets are shared between manual drying, queue auto-drying, and ambient drying.
 
 !!! info "Composites dry as their base material"
     The preset table is keyed by base material, while the printer reports filled and foamed variants by their full name — `PA6-CF`, `PETG-CF`, `ABS-GF`, `PLA-AERO`. A variant with no row of its own takes its base material's: `PETG-CF` dries at PETG's temperature, and the polyamide spellings (`PA6`, `PA11`, `PA12`, `PAHT`, `PPA`, and `Nylon`) all take PA's.
@@ -448,7 +448,7 @@ Two of those states need you to act, and the session waits indefinitely until yo
 - **Connect AMS power adapter to enable drying** — codes 1 and 8
 - **Retract the filament at the AMS outlet to start drying** — code 3
 
-A session can also fail when it tries to start. The usual cause is firmware too old for remote drying, which Bambuddy cannot check if the printer was offline when you scheduled. The card shows the failed session in red with the reason. Clear it with the **×** button.
+A session can also fail. The usual cause is firmware too old for remote drying, which Bambuddy cannot check if the printer was offline when you scheduled. A session also fails when the printer accepts the command on an idle printer but the AMS never starts drying (see ["Drying not running"](#drying-not-running)). The card shows the failed session in red with the reason, in your language. Clear it with the **×** button.
 
 !!! warning "An interrupted session starts over"
     If something stops the dryer before the run finishes, such as a print claiming the AMS, the session goes back to pending and runs again for its full duration once the printer is free. Nothing limits how late that is, so a session interrupted overnight can start again the next afternoon.
@@ -470,6 +470,25 @@ When drying is active, a status bar appears between the AMS header and slot grid
     The printer reports how long is left, but never which filament or temperature the cycle is running. Bambuddy shows what it sent when you started the cycle from here. If the cycle was started from the printer's own screen, or Bambuddy restarted while it was running, that record is gone.
 
     It then falls back to the loaded spools, which can name the filament but never the temperature. When every slot holds the same type, that is what is being dried, so the badge says so; on a mixed unit it shows the countdown alone rather than guessing. The temperature has no fallback at all — you choose it freely when starting a cycle, so the spools' own recommended drying temperature is no evidence of what the cycle is actually running. Expect to see just the filament and the countdown in that case.
+
+### "Drying not running" { #drying-not-running }
+
+A printer sets an AMS unit's drying countdown as soon as it accepts a drying command, and a running cycle counts it down once a minute. If the countdown has not moved for 150 seconds and the AMS reports no Checking, Drying or Cooling phase, Bambuddy shows a grey **Drying not running** badge instead of the amber one. The countdown is hidden, because it is not counting, and hovering the badge explains why. The **×** button still stops it.
+
+There are two ways to get here, and they look the same:
+
+- **The cycle never started.** The printer took the command but the AMS never began heating. This was seen on an H2D during a print: two AMS-HT units were drying, and a third unit's timer sat at 720 minutes without heating.
+- **The cycle was paused partway**, for example by the power limit or the current print.
+
+As soon as the AMS reports an active phase, or the countdown moves again, the badge goes back to the amber **Drying** state on its own. A phase the AMS reports always wins over the 150-second rule. After Bambuddy restarts, the 150 seconds start again.
+
+If a unit stays on this badge, make sure the AMS has power and, if a print is running, wait for it to finish. If drying still doesn't start, stop it with **×** and start it again.
+
+A timer like this never reaches zero, so Bambuddy doesn't wait for it to end:
+
+- In [blocking mode](#blocking-vs-non-blocking-mode), a printer whose only drying timers are not running doesn't hold the queue.
+- A [scheduled session](#when-a-scheduled-session-starts) whose timer stops running goes back to pending if a print is running, and runs again once the printer is free. On an idle printer it fails with **The printer accepted the command, but the AMS did not start drying**. Either way the timer is left on the printer, since it may still start once power frees up.
+- The AMS high-temperature alarm is not held back for a unit that isn't actually heating.
 
 ### Stopping a Drying Session
 
@@ -516,7 +535,7 @@ When an AMS unit contains **mixed filament types** (e.g., PLA and PETG in the sa
 
 A single global humidity threshold is a poor fit for multi-material print farms — Nylon wants to stay under 20%, PLA is happy at 60%, ASA somewhere in between. Bambuddy lets you set a different **trigger threshold per filament type**, in addition to the conservative drying temp/duration above.
 
-Configure overrides in **Settings** > **Workflow** > **Auto-Drying** in the table directly below the **Drying Presets** table:
+Configure overrides in **Settings** > **Workflow** > **Queue Auto-Drying** in the table directly below the **Drying Presets** table:
 
 | Filament | Threshold |
 |----------|-----------|
@@ -554,7 +573,7 @@ Both consumers go through the same resolver, so they can never disagree on wheth
 
 1. Go to **Settings** > **AMS Display Thresholds**
 2. Set the **Fair (orange) ≤** humidity threshold — this is the trigger point for auto-drying
-3. Scroll to **Queue Auto-Drying**
+3. Go to **Settings** > **Workflow** and find the **Queue Auto-Drying** card
 4. Enable **Enable auto-drying**
 5. Optionally enable **Wait for drying to complete** (blocking mode)
 
@@ -620,7 +639,7 @@ Automatically dry filament on any idle printer whenever AMS humidity exceeds the
 
 1. The scheduler continuously monitors all idle printers
 2. For each AMS unit, it reads the current humidity level
-3. If humidity exceeds the **Fair (orange)** threshold from Settings, drying is triggered
+3. If humidity exceeds the **Fair (orange)** threshold from Settings, drying is triggered — after the [sustained-humidity wait](#sustained-humidity), if it is switched on
 4. The drying temperature and duration are determined by the loaded filament types using the configured [drying presets](#configurable-drying-presets)
 5. Drying runs for the preset **duration** — the printer stops it automatically when the cycle completes
 
@@ -628,9 +647,30 @@ Unlike queue auto-drying, ambient drying does not require any scheduled queue it
 
 ### Enabling Ambient Drying
 
-1. Go to **Settings** > **Print Queue**
-2. Find **Ambient Drying**
-3. Enable **Enable ambient drying**
+1. Go to **Settings** > **Workflow**
+2. Find the **Queue Auto-Drying** card
+3. Enable **Ambient drying**
+
+### Waiting Out a Humidity Spike { #sustained-humidity }
+
+Opening the AMS lid can admit room air and cause a temporary humidity rise. Ambient drying uses the unit's effective humidity trigger threshold: the most restrictive applicable per-filament threshold when overrides are configured, or the global **AMS Humidity Threshold (Fair)** otherwise (see [Per-Filament Humidity Threshold](#per-filament-humidity-threshold)). With the sustained wait off, one reading above that threshold can start a cycle. Whether a rise is transient or signals a need for drying depends on the AMS and room conditions.
+
+**Require sustained humidity** (shown once ambient drying is enabled, in the same settings block) makes an ambient start wait until the unit's humidity has stayed above its effective trigger threshold **continuously** for a set number of minutes (5–240). The field starts at 15 minutes when you switch it on. Off by default — with it off, ambient drying starts instantly, exactly as before. The wait belongs to ambient drying: with ambient drying off it has no effect, even if a value is still stored.
+
+Continuously means exactly that:
+
+- A single reading back at or below the threshold clears the wait. The clock starts over the next time the reading crosses the threshold.
+- A missing reading is treated as no information, not as a dip — a sensor that skips a beat does not reset the count.
+- A gap longer than four scheduler polling intervals, with a two-minute minimum (for example, after Bambuddy restarts, the printer disconnects, or a print runs on a printer that is not [drying while printing](#continue-drying-while-printing)), restarts the wait. Time nobody measured is not evidence the humidity stayed high. The restart is logged, so a wait that never matures can be explained from the log.
+
+Only a printer with a **scheduled queue item pending** keeps the instant behavior — minutes burned ahead of a scheduled job is exactly what [queue auto-drying](#queue-auto-drying) exists to prevent, and the exemption follows the schedule whether the printer is idle or printing. While ambient drying is on, a start on a printer that is printing (possible with [Continue drying while printing](#continue-drying-while-printing)) serves the same wait as a start on an idle printer: a lid opened mid-print causes the same brief spike.
+
+Note that the exemption is per **printer**, not per AMS unit: any pending scheduled item lifts the wait for every AMS on that printer, including units the scheduled job will never touch. A printer that always has something queued — a standing schedule, for instance — effectively never waits; its drying is governed by [queue auto-drying](#queue-auto-drying)'s deadline logic instead.
+
+The wait runs **alongside** the 30-minute [cooling-off period](#drying-threshold-floor) after a finished cycle rather than after it, so a re-dry waits for whichever is longer, not both in a row. And like the cooling-off period and the unproductive-cycle suspension, it only ever delays *starting* a cycle — a running cycle, or one you started by hand, is untouched.
+
+!!! tip "Picking a value"
+    **15 minutes is a measured starting point, not a guarantee.** On one H2D, every AMS unit was back at or below 25% humidity within about 12 minutes of opening its lid for one to five minutes. If your AMS normally sits close to its threshold, the reading may not drop back below it during the wait, and drying will start — which is the right outcome. Adjust the value for how far your threshold sits above the closed-lid reading, how long you usually keep the lid open, and your room and desiccant. See [the measurement notes in the code PR](https://github.com/maziggy/bambuddy/pull/2895) for the details and limitations.
 
 ### Using Both Modes Together
 
@@ -647,7 +687,7 @@ When both are enabled and a printer has scheduled prints, queue auto-drying take
 
 - AMS 2 Pro or AMS-HT unit (original AMS does not support drying)
 - Supported printer firmware (see [firmware requirements](#printer-firmware-requirements) above)
-- Humidity above the Fair threshold
+- Humidity above the effective trigger threshold (per-filament override when configured; otherwise the global Fair threshold)
 - No active power constraints on the AMS unit (see [power supply requirements](#power-supply-requirements))
 
 !!! tip "Print Farm Use Case"
@@ -657,9 +697,9 @@ When both are enabled and a printer has scheduled prints, queue auto-drying take
 
 ## :material-fire-truck: Continue Drying While Printing
 
-Bambu shipped an "AMS Print While Drying" firmware feature on selected printers that lets the AMS keep running its drying cycle **concurrently** with an active print. With this feature enabled in Bambuddy, the existing auto-drying scheduler can also evaluate printers that are mid-print — drying does not stop the instant a print starts.
+Bambu shipped an "AMS Print While Drying" firmware feature on selected printers that lets the AMS keep running its drying cycle **concurrently** with an active print. With this feature enabled in Bambuddy, the existing auto-drying scheduler can also evaluate printers that are mid-print — drying does not stop the instant a print starts. With queue auto-drying or ambient drying also on, a printing printer is dried when its humidity is above the threshold, whether or not it has scheduled prints. The [sustained-humidity wait](#sustained-humidity) applies to these starts only while ambient drying is on.
 
-**Off by default.** Opt-in toggle in **Settings** > **Workflow** > **Continue drying while printing**.
+**Off by default.** Opt-in toggle in **Settings** > **Workflow** > **Queue Auto-Drying** > **Continue drying while printing**.
 
 ### Firmware Requirements
 
@@ -695,8 +735,8 @@ On an unsupported printer the toggle has no effect — the firmware reports `dry
 
 ### Enabling
 
-1. Go to **Settings** > **Print Queue**
-2. Find **Continue drying while printing**
+1. Go to **Settings** > **Workflow**
+2. Find **Continue drying while printing** in the **Queue Auto-Drying** card
 3. Enable the toggle
 
 The toggle is independent of [queue auto-drying](#queue-auto-drying) and [ambient drying](#ambient-drying) — you can mix and match. With all three enabled, drying runs in idle gaps **and** during prints on capable hardware, each cycle running for its configured preset duration.
@@ -833,7 +873,7 @@ Get notified about AMS conditions:
 | Event | Description |
 |-------|-------------|
 | **High Humidity** | When humidity exceeds threshold |
-| **Low Filament** | When filament is running low |
+| **Low Filament** | When the spool assigned to a slot drops below its low-stock threshold ([details](notifications.md#printer-events)) |
 | **AMS Error** | When AMS encounters issues |
 
 ### Setting Up

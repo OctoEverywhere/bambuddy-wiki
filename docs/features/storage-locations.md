@@ -63,7 +63,7 @@ When adding or editing a spool, open the **Additional** section and pick a **Sto
 ![Edit Spool — Storage Location dropdown](../assets/inventory-edit-storage-location.png){ .screenshot }
 
 !!! info "Labels and QR codes"
-    The storage location name appears on box-label and Avery label templates (see [Printable Labels](inventory.md#printable-labels)). It is omitted from the compact AMS-holder template because of size limits.
+    The storage location name can be printed on every label template (see [Printable Labels](inventory.md#printable-labels)). It is on by default; untick **Storage location** in the label picker to leave it off.
 
 ---
 

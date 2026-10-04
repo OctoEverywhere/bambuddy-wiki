@@ -222,10 +222,29 @@ Hover over any AMS slot to see:
 AMS Lite units (e.g., A1 series) have no weight sensor and always report 0% fill level. When a spool is linked to Spoolman and has weight data, Bambuddy uses Spoolman's remaining weight instead:
 
 - **AMS with weight sensor** - Uses AMS percentage directly (no change)
-- **AMS Lite (reports 0%)** - Falls back to Spoolman: `(remaining_weight / filament_weight) × 100`
+- **AMS Lite (reports 0%)** - Falls back to Spoolman: `(remaining weight / spool size) × 100`, with the spool size taken as described in [Spool Size (Label Weight)](#spool-size-label-weight)
 - **External spool** - Shows fill level from Spoolman if linked (otherwise shows "—")
 
 When Spoolman data is used, the hover card displays "(Spoolman)" next to the fill percentage so you can distinguish the data source.
+
+#### Spool Size (Label Weight)
+
+Spoolman stores how much filament a full spool holds in two places: the spool's own **Initial Weight**, and the filament's **Weight** as the catalogue value. One filament can have spools of different sizes, so Bambuddy uses the spool's **Initial Weight** and falls back to the filament's **Weight** only when the spool has none.
+
+This is the **Label Weight** in the spool form. It is used for the fill level, for **Sync Weights from AMS** (the AMS percentage is a percentage of this spool), and for print cost. Changing it in the spool form changes only that spool; the filament and any other spools of it are left alone.
+
+The **Cost per kg** in the spool form is stored in Spoolman as the spool's **Price**, which Spoolman treats as the price of the whole spool. Bambuddy converts between the two using the spool's size, so 25 per kg on a 250 g spool is stored as a price of 6.25.
+
+#### Empty Spool Weight (Tare)
+
+When you weigh a spool in Bambuddy or on a SpoolBuddy scale, the remaining weight is the scale reading minus the empty spool weight. Bambuddy takes that weight from Spoolman in the same order Spoolman does:
+
+1. The spool's own **Spool Weight**
+2. The filament's **Spool Weight**
+3. The vendor's **Empty Spool Weight**
+4. 250 g, if none of the three is set
+
+The **Empty Spool Weight** shown in the spool form comes from the same order. Setting it once on the vendor covers every spool of that vendor that has no weight of its own.
 
 ### Opening Linked Spools
 
@@ -390,19 +409,16 @@ When spools are removed from AMS:
 
 Get notified when spools run low:
 
-### In Spoolman
+Bambuddy sends the alert; Spoolman supplies the remaining weight.
 
-Configure low stock threshold:
+1. Assign your Spoolman spools to AMS slots in Bambuddy.
+2. Set the low-stock threshold on the **Inventory** page (default 20 %).
+3. Enable the **Low Filament** event on a notification provider.
 
-1. Set minimum quantity per spool
-2. Spoolman alerts when below
+When an assigned spool drops below the threshold you get one notification, such as "X2D: Slot A1 at 15%". It can fire again once the spool goes back above the threshold, for example when you load a fresh one.
 
-### In Bambuddy
-
-Notifications for low filament:
-
-- Enable **Low Filament** event
-- Get notified when AMS spool is low
+!!! note
+    In Spoolman mode only the global threshold applies. The per-spool override is a field of Bambuddy's own inventory and has no counterpart in Spoolman.
 
 [:material-arrow-right: Notification setup](notifications.md)
 
@@ -465,9 +481,11 @@ The price comes from Spoolman, in this order:
    something other than the catalogue figure.
 2. **The filament's `Price`**, otherwise.
 
-The rate per gram is that price divided by the filament's **`Weight`** — the net
-filament weight, not including the spool core — so a 750 g roll is priced as a
-750 g roll.
+The rate per gram is that price divided by the net filament weight it was paid
+for, not including the spool core. The spool's own price is divided by the
+spool's **`Initial Weight`** (or the filament's **`Weight`** if the spool has
+none), so a 250 g spool is priced as a 250 g spool. The filament's price is
+divided by the filament's **`Weight`**.
 
 !!! note "When a price is missing"
     Grams that no spool could price are charged at **Settings → Default

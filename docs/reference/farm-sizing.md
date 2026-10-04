@@ -158,6 +158,10 @@ Large PostgreSQL farms can also raise the connection pool with `DB_POOL_SIZE` an
 `DB_MAX_OVERFLOW` if you see pool timeouts under load
 ([details and the connection-ceiling arithmetic](../features/postgresql.md#tuning-for-large-printer-farms)).
 
+On SQLite the pool defaults to 10 base connections plus 90 on demand (20 + 200 before
+1.2.6). A large farm still on SQLite that sees pool timeouts can raise `DB_MAX_OVERFLOW`,
+but moving to PostgreSQL is the better fix.
+
 ---
 
 ## :material-check-all: What scales cheaply

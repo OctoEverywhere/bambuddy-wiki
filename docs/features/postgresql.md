@@ -243,13 +243,13 @@ is the ceiling on concurrent database connections (per app worker process).
 
 ### Tuning for large printer farms
 
-On large farms (many dozens of printers), the default 100-connection ceiling can be
+On large farms (many dozens of printers), the default 80-connection ceiling can be
 raised. Each of these is optional and overrides the default when set:
 
 | Variable | Default (PostgreSQL) | Purpose |
 |----------|----------------------|---------|
 | `DB_POOL_SIZE` | `20` | Base connections kept open |
-| `DB_MAX_OVERFLOW` | `80` | Extra connections opened on demand |
+| `DB_MAX_OVERFLOW` | `60` (`80` before 1.2.5.7) | Extra connections opened on demand |
 | `DB_POOL_TIMEOUT` | `30` | Seconds a request waits for a free connection before erroring |
 | `DB_POOL_RECYCLE` | `1800` | Seconds before a pooled connection is recycled |
 | `DB_POOL_USE_LIFO` | `true` | Reuse the most-recently-returned connection so a bursty farm keeps a small hot set busy and lets excess overflow connections age out via `DB_POOL_RECYCLE` instead of churning the whole pool. Set `false` for strict round-robin (FIFO) |
@@ -266,17 +266,11 @@ DB_MAX_OVERFLOW=180   # 200-connection ceiling
     `max_connections` in `postgresql.conf` accordingly (and note each connection
     costs memory server-side).
 
-    **This applies to the defaults too, not just to raised values.** The default
-    ceiling is `20 + 80 = 100`, while a stock PostgreSQL ships
-    `max_connections = 100` and reserves 3 of those for superusers — leaving 97.
-    So a default Bambuddy against a default PostgreSQL is already over budget.
-    Either lower the overflow:
-
-    ```bash
-    DB_MAX_OVERFLOW=60   # 80-connection ceiling, fits under 97
-    ```
-
-    or raise the server:
+    The default ceiling is `20 + 60 = 80`, which fits a stock PostgreSQL:
+    it ships `max_connections = 100` and reserves 3 of those for superusers,
+    leaving 97. Up to 1.2.5.6 the default was `20 + 80 = 100`, already over
+    that budget; on those versions set `DB_MAX_OVERFLOW=60`. When you raise the
+    pool, raise the server with it:
 
     ```conf
     # postgresql.conf

@@ -9,7 +9,7 @@ thermometer, a humidity/battery sensor — to either a **printer** or a
 an alert condition, and the reading shows up where it's relevant, with
 alerts and notifications on top.
 
-![Settings — Sensors overview](/assets/settings-sensors-overview.png){ .screenshot }
+![Settings — Sensors overview](../assets/settings-sensors-overview.png){ .screenshot }
 
 ---
 
@@ -113,12 +113,12 @@ machine, so there is no queue to hold, and a humid drybox is something to be
 told about rather than something that should stop a printer which may not even
 be using it.
 
-![Filament card with a location sensor footer](/assets/inventory-location-sensors-card.png){ .screenshot }
+![Filament card with a location sensor footer](../assets/inventory-location-sensors-card.png){ .screenshot }
 
 The inventory table gains sortable Temperature, Humidity, and Battery
 columns, colorized the same way as the filament card:
 
-![Inventory table with Temperature, Humidity, and Battery columns](/assets/inventory-location-sensors-table.png){ .screenshot }
+![Inventory table with Temperature, Humidity, and Battery columns](../assets/inventory-location-sensors-table.png){ .screenshot }
 
 ### Adding a Sensor
 
@@ -196,7 +196,7 @@ siblings; it does not abandon the dialog.
 
 ### Sensor Options
 
-![Location Sensor Options dialog](/assets/inventory-location-sensors-options.png){ .screenshot .centered style="max-width: 420px" }
+![Location Sensor Options dialog](../assets/inventory-location-sensors-options.png){ .screenshot .centered style="max-width: 420px" }
 
 Click the gear icon next to **Add Sensor** to open **Location Sensor
 Options**:

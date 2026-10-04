@@ -30,12 +30,13 @@ Connect external network cameras to replace the built-in printer camera. Useful 
 
 ### Configuration
 
-1. Go to **Settings** > **General** > **Camera**
-2. Find your printer in the **External Cameras** section
-3. Toggle the switch to enable
-4. Enter the camera URL
-5. Select the camera type
-6. Click **Test** to verify connection
+1. Go to **Settings** > **Camera**
+2. Under **External Cameras**, click **Add external camera**, then search for the printer by name or location and pick it. Its camera fields open
+3. Enter the camera URL
+4. Select the camera type, and the rotation if the camera is mounted turned
+5. Click **Test** to verify connection
+
+The list shows only printers that have an external camera, so it stays short however many printers you run. A closed row shows the camera type and where it points, such as `MJPEG · 192.168.1.61:1984`; click the row to open its fields, and only one printer is open at a time. The bin icon at the end of a row switches that printer back to its built-in camera.
 
 !!! tip "RTSP Authentication"
     Include credentials in the URL: `rtsp://user:password@192.168.1.50:554/stream`
@@ -44,7 +45,7 @@ Connect external network cameras to replace the built-in printer camera. Useful 
     For USB cameras, enter the device path (e.g., `/dev/video0`). Bambuddy will auto-detect available V4L2 devices. Install `v4l2-utils` for enhanced device detection: `sudo apt install v4l-utils`
 
 !!! tip "Snapshot URL override (go2rtc, IP cameras with `/frame.jpeg`-style endpoints)"
-    For **MJPEG**, **RTSP** and **USB** stream types, you can optionally provide a separate **Snapshot URL** below the live-stream URL. When set, Bambuddy fetches single-frame captures (notification thumbnails, finish photos, timelapse, plate detection) from this URL via plain HTTP GET instead of opening the live stream.
+    For **MJPEG**, **RTSP** and **USB** stream types, you can optionally provide a separate **Snapshot URL** below the live-stream URL (hover the info icon next to it for a reminder of what it does). When set, Bambuddy fetches single-frame captures (notification thumbnails, finish photos, timelapse, plate detection) from this URL via plain HTTP GET instead of opening the live stream.
 
     Useful when:
 
@@ -281,6 +282,35 @@ This creates a visual record of your completed prints!
 
 ---
 
+## :material-lightbulb-on: Chamber Light for the Camera
+
+If you keep the chamber light off between uses, the live view is black and the photos in your notifications are too. Bambuddy can switch the light on whenever the camera is used:
+
+1. Go to **Settings** > **Camera**
+2. Under **Turn on chamber light for camera**, choose:
+    - **All printers**, so every printer does it, or
+    - **Selected printers**, then click **Add printer**, search for a printer by name or location and pick it. Each picked printer shows as a chip; click its **×** to take it off the list.
+3. Optionally set **Wait before snapshot** (2 seconds by default, up to 5). It applies to every printer.
+
+**Off** is the default, so no printer's light changes until you choose otherwise.
+
+The light then turns on:
+
+- while anyone watches the live view, including the camera wall and a [streaming overlay](#streaming-overlay-for-obs)
+- for automatic pictures: notification photos, the live finish photo, and the snapshot that Home Assistant and other automations fetch from `/camera/snapshot`
+
+It turns off again 15 seconds after the last use, so a viewer that reconnects or the camera wall's refresh doesn't make it flash.
+
+**Wait before snapshot** gives the light, and any room light Home Assistant syncs to it, time to come on before an automatic picture is taken. It only applies when the light was off; the live view never waits.
+
+!!! note "Bambuddy only turns off a light it turned on"
+    If the light was already on, it stays on. If you switch the light by hand on the printer card while the camera is in use, the light is yours again and stays as you set it.
+
+!!! note "What doesn't switch the light"
+    The layer timelapse, the Obico failure check and the frames Bambuddy keeps during a print for the finish photo capture all through a print, so the light would flash with every frame. They use whatever light the printer has. A finish photo taken from the printer's own timelapse video was filmed during the print, so it isn't lit either.
+
+---
+
 ## :material-scan-helper: Build Plate Empty Detection
 
 Automatically detect if objects are left on the build plate before a print starts. If detected, the print is immediately paused and you receive a notification.
@@ -482,6 +512,12 @@ When a stall is detected:
 !!! tip "Network Interruptions"
     If your network briefly drops, the stream will automatically recover once the connection is restored.
 
+### Frozen Picture
+
+Bambuddy also watches what the camera sends, not only that it sends something. A built-in (RTSP) camera that keeps sending the same frame for 20 seconds counts as frozen. This happens when the connection to the printer has dropped but `ffmpeg` keeps repeating its last frame. Bambuddy then restarts `ffmpeg` and reconnects to the printer, and open viewers stay connected. The log shows `RTSP output frozen … restarting ffmpeg` when this happens.
+
+A working camera practically never sends two identical frames, because sensor noise changes every one. In a completely dark chamber the picture can come out identical, though. If the picture after a restart is exactly the same as before, Bambuddy treats it as a still picture and only checks again every 5 minutes, until it changes.
+
 ---
 
 ## :material-stethoscope: Built-in Camera Diagnostic
@@ -614,7 +650,7 @@ The same shape works for any Bambu printer that speaks RTSPS on port `322` — *
    http://192.168.101.29:1984/api/stream.mjpeg?src=p2s_mjpeg
    ```
 
-2. In Bambuddy → **Settings** → **General** → **Camera** → enable **External Camera** for the affected printer.
+2. In Bambuddy → **Settings** → **Camera** → enable **External Camera** for the affected printer.
 3. Paste the go2rtc URL above into the **Camera URL** field, set type to **MJPEG**, and click **Test**.
 4. Save.
 
@@ -676,13 +712,42 @@ For example: `http://192.168.1.100:8000/overlay/1`
 
 ### Streaming Overlay token (login-enabled deployments)
 
-1. Go to **Settings → API Keys** (Camera API Tokens).
-2. Create a token with the **Streaming Overlay** scope. Copy the ready-made
-   overlay URL shown once on creation — it already includes the token.
-3. In the URL, set the printer number: `/overlay/1` is printer 1, `/overlay/2`
-   is printer 2, and so on (the number matches the printer's URL on the Printers
-   page).
-4. Paste that URL into OBS.
+1. Go to **Settings → Camera → Streaming Overlay**.
+2. Choose **Create overlay token**, give it a name and expiry, and create it.
+   The builder uses the token returned at creation. You can also create one in
+   **Camera API Tokens** with the **Streaming Overlay** scope and copy it into
+   **Manual token**.
+3. Choose the printer and appearance settings, then choose **Copy** next to the
+   URL.
+4. Paste the complete URL into OBS and keep it somewhere safe.
+
+While a token is being created, Cancel, manual entry and import are disabled,
+so the token returned at creation cannot be lost. If creation fails, the
+server's error is shown and those controls become available again. Import is
+also unavailable while a logo upload or removal is running.
+
+Tokens are stored as hashes and cannot be retrieved later. The builder holds
+the token only in memory and clears it when you leave or reload the page.
+**Manual token** and the generated URL are masked until you choose **Show
+token**; **Copy** always copies the complete, working URL.
+
+To edit an existing browser source, paste its complete URL into **Existing
+overlay URL** and choose **Import URL**, or paste its token into **Manual
+token**. Import reads the URL in the browser; it does not contact the server
+in it. It takes the printer, token, layout, fields, text size, FPS, artwork,
+camera, background transparency and branding settings. Like the overlay page,
+it clamps FPS to 1–30 and ignores fields and parameters it doesn't know. A URL
+that isn't an overlay URL, has more than one token, or contains a user name or
+password is rejected without changing the current settings. The generated URL
+uses this Bambuddy installation, so check the selected printer when importing
+from another installation. Copy the updated URL back into OBS after changing
+settings.
+
+!!! note "Lost every copy of a URL?"
+    A token cannot be shown again. Create a new one, update your browser
+    sources, then revoke the old token.
+
+![Streaming Overlay builder with URL import and masked manual token entry](../assets/images/streaming-overlay/token-builder.png)
 
 The URL then looks like:
 
@@ -705,6 +770,7 @@ The overlay displays:
 |---------|-------------|
 | **Camera Feed** | Full-screen live camera view |
 | **Bambuddy Logo** | Branding in top-right corner (links to GitHub) |
+| **Printer Name / Model** | Printer name and/or model, e.g. `Big Mumma · H2D` (both off by default — see Show/Hide Elements) |
 | **Filename** | Current print file name |
 | **Status** | Printing, Paused, Idle, etc. |
 | **Progress Bar** | Visual progress with percentage |
@@ -718,7 +784,7 @@ The overlay displays:
 1. In OBS, click **+** under Sources
 2. Select **Browser**
 3. Enter the overlay URL (e.g., `http://192.168.1.100:8000/overlay/1`)
-4. Set width and height to match your scene (e.g., 1920x1080)
+4. Set width and height to match your scene (e.g., 1920x1080, or 1080x1920 for a portrait URL)
 5. Click **OK**
 
 !!! tip "Single Source"
@@ -727,13 +793,49 @@ The overlay displays:
 ### Customization
 
 !!! tip "Build the URL in the UI"
-    **Settings → API Keys → Streaming Overlay** has a builder: pick the printer,
-    tick the fields you want, set size and frame rate, paste in a token if you
-    need one, and copy the finished URL. It also has a preview so you can see
+    **Settings → Camera → Streaming Overlay** has a builder: pick the printer,
+    tick the fields you want, set layout, size, artwork, frame rate and branding,
+    paste in a token if you need one, and copy the finished URL. It also has a preview so you can see
     the result before pasting it into OBS. The parameters below are what it
     produces, documented for anyone assembling a URL by hand or scripting one.
 
+    The builder remembers your choices in the browser you used, so it reopens
+    as you left it. The token is never stored: enter or import it again, or
+    create a new one. **Reset choices** at the top puts every choice back to
+    its default and leaves the token and the uploaded logo alone. In another
+    browser, or for another admin, the builder starts from the defaults.
+
 Customize the overlay using query parameters:
+
+#### Landscape, portrait, or both
+
+Choose **Layout** independently of **Artwork**. Both Classic and Version 2 support all three choices:
+
+| Layout | URLs and previews | OBS browser-source dimensions |
+| --- | --- | --- |
+| Landscape, the default | One landscape URL and preview | 1920 × 1080 |
+| Portrait | One portrait URL and preview | 1080 × 1920 |
+| Both | Separate landscape and portrait URLs and simultaneous previews | One source at each size |
+
+Each URL has its own **Copy** and **Open** actions. In Both mode, add the two URLs as separate browser sources to your landscape and portrait scenes. They share the selected printer, fields, text size, camera visibility, frame rate, branding and token. They can run at the same time.
+
+**Show preview** starts only the selected previews. **Hide preview** or leaving the settings page removes them and closes their streams. Changes to the settings update both the URLs and visible previews. Previews use the recommended source dimensions, scaled down to fit the settings card.
+
+Landscape URLs omit the layout parameter to preserve Classic text sizing at any source resolution. Portrait URLs select a fixed composition:
+
+```text
+/overlay/1
+/overlay/1?layout=portrait
+/overlay/1?layout=portrait&artwork=2
+```
+
+Portrait URLs keep their 1080 × 1920 composition when opened in a differently sized browser window, scaled to fit with empty space where needed. OBS makes that space transparent; a normal browser tab shows the page background there. Use the recommended dimensions in OBS to fill the source. `both` is a builder choice, not a URL parameter. Landscape URLs keep their viewport behaviour, including Classic text sizing at 1280 × 720. Existing explicit `layout=landscape` URLs remain supported and use a fixed 1920 × 1080 canvas. Unrecognised layout values follow the viewport.
+
+Classic portrait uses larger, wrapping text and fits the camera without stretching it. Version 2 uses its portrait header, cropped camera and information panel. Both respect camera rotation. For all URLs, disconnected printers hide stale progress and temperatures, and finished prints do not also show an idle message. The Status toggle controls status text, including the offline message.
+
+![Both layouts in the overlay builder](../images/stream-overlay/layouts-after.png)
+
+*Version 2 with both previews. The image uses simulated data and a camera test pattern, not a live printer.*
 
 #### Size
 
@@ -770,6 +872,75 @@ If another viewer already has the printer's camera open, the overlay joins that
 viewer's stream and runs at its frame rate - see
 [Shared Streams and FPS](#shared-streams-and-fps).
 
+#### Version 2 artwork (portrait and landscape)
+
+In **Settings → Camera → Streaming Overlay**, set **Artwork** to **Version 2**, select the fields to show, and copy the generated URL into your OBS browser source. **Classic** is the default, and existing URLs keep the original layout unless you add `artwork=2`.
+
+```
+/overlay/1?artwork=2&show=printer,model,filename,status,progress,layers,eta,nozzle,bed,chamber
+```
+
+Set the browser source dimensions in OBS to the composition you want:
+
+- **Portrait, 1080 × 1920:** printer identity and Bambuddy logo above a cropped camera view, with print information below.
+- **Landscape, 1920 × 1080:** a full-screen camera behind printer identity and a translucent information panel along the bottom.
+
+Screenshots below show the layouts with simulated print data and a camera test pattern, not a live printer feed.
+
+![Classic landscape overlay](../images/stream-overlay/original-landscape.png)
+
+*Classic, for comparison*
+
+![Version 2 landscape overlay](../images/stream-overlay/updated-landscape.png)
+
+*Version 2, landscape*
+
+![Version 2 portrait overlay](../images/stream-overlay/updated-portrait.png){ width="360" }
+
+*Version 2, portrait*
+
+Without a `layout` parameter, Version 2 follows the browser source viewport. The builder omits this parameter for Landscape and adds `layout=portrait` for Portrait, as described above.
+
+The camera keeps its aspect ratio and fills the available area by cropping. Portrait cropping can hide the sides of the build plate. Camera rotation and the frame-rate setting still apply.
+
+All field toggles remain independent. Hidden or unavailable readings leave no empty boxes. Printer name and model appear in the header. The **Text size** setting adjusts the new layout too. `camera=false` hides the camera without starting a stream. A disconnected printer shows **Printer offline** when Status is enabled and hides stale progress and temperature readings. Finished and failed jobs show their status without an idle message.
+
+When login is enabled, use the same **Streaming Overlay** token as the Classic overlay. Version 2 does not grant additional access.
+
+Selecting **Version 2** also reveals a **Background transparency** slider. Increase it from 0% to 100% to fade the dark backgrounds while keeping text, logos and the camera fully visible. At 0%, the original backgrounds are preserved; at 100%, the backgrounds are transparent. Hide the camera if you want only the overlay information over another OBS source.
+
+The generated URL includes `backgroundTransparency=65`, for example, when the slider is above zero. Classic ignores this parameter. Missing or invalid values preserve the default; numbers outside 0–100 are clamped to that range. Switching back to Classic hides the slider and omits the parameter without losing the slider selection for Version 2.
+
+![Version 2 background transparency slider](../images/stream-overlay/branding-transparency-slider.png)
+
+At 100%, a background placed behind the overlay remains visible. The checkerboard below illustrates transparent pixels and is not part of the overlay.
+
+![Version 2 with fully transparent backgrounds](../images/stream-overlay/branding-transparent.png)
+
+#### Custom logo and progress colours
+
+In **Settings → Camera → Streaming Overlay → Branding**, upload a PNG or WebP logo. Transparency is preserved. Images must be at most 2 MiB and 4 million pixels; animated images are not supported. Bambuddy stores a sanitized PNG on the server, resized to fit within 512 × 512 pixels.
+
+Enable **Custom logo** to include it in the generated overlay URL. Both Classic and Version 2 place it above the Bambuddy logo, preserving its proportions and limiting its size. The existing Bambuddy mark stays visible.
+
+There is one shared logo per Bambuddy installation. Replacing it changes what every logo-enabled overlay loads next time it opens or refreshes. **Remove** deletes the saved logo and clears the builder's selection. Refresh existing OBS browser sources after replacing or removing the logo. Without a saved logo, the original layout is used. Unchecking **Custom logo** only removes it from the generated URL.
+
+Use **From colour** and **To colour**, either their pickers or six-digit hex inputs, to colour the filled part of the progress bar, the Progress label, and the percentage from left to right. Set both to the same value for a solid colour. **Reset colours** restores the artwork's original colours, including its state-dependent styling. Invalid hex input does not replace the last valid selection.
+
+In Version 2, custom progress colours override the state-dependent colours of the progress bar, Progress label, and percentage. The selected gradient stays in use when the printer state changes. Use **Reset colours** to restore the state-dependent colours.
+
+```text
+/overlay/1?logo=1&progressFrom=%23ff0088&progressTo=%230088ff
+```
+
+`logo=1` opts into the saved logo. `progressFrom` and `progressTo` must both be valid `#RRGGBB` colours; URL-encode the `#` as `%23` when writing URLs by hand. Existing URLs without these parameters retain their original appearance. Colours are stored in the URL, while the logo is stored on the server.
+
+When login is enabled, uploading or removing the shared logo requires `settings:update`. The settings preview requires `settings:read`. OBS accesses it with the same **Streaming Overlay** token used for the status feed; camera-only and Cam Wall tokens cannot read it.
+
+![Classic overlay with custom logo and gradient](../images/stream-overlay/branding-classic.png)
+
+![Version 2 with custom logo and gradient](../images/stream-overlay/branding-version2.png)
+
 #### Status-Only Mode (No Camera)
 
 Hide the camera feed and show only the status overlay on a black background:
@@ -802,11 +973,14 @@ Available elements:
 | `layers` | Layer count (current/total) |
 | `eta` | Time remaining and ETA |
 | `filename` | Print file name |
-| `status` | Status text (Printing, Paused, etc.) |
+| `status` | Status text (Printing, Paused, etc.), including the offline message |
 | `printer` | Printer name |
+| `model` | Printer model (off by default; omitted if unknown) |
 | `nozzle` | Nozzle temperature (both nozzles on a dual-nozzle printer) |
 | `bed` | Bed temperature |
 | `chamber` | Chamber temperature |
+
+`printer` and `model` are independent and share one line: with both, the overlay shows `Big Mumma · H2D`; with only `model`, just `H2D`. The model comes from the printer's settings in Bambuddy and is left out, separator included, when none is stored. A long name and model is cut off with an ellipsis rather than running past the edge of a narrow OBS source. In the builder, tick **Printer model** under **Fields to show**. It is off by default, so an overlay URL already in OBS looks the same until you replace it with one that includes `model`.
 
 Temperatures are shown whether or not a print is running — a preheating printer is exactly when they are worth watching. Each reading appears only when the printer reports it, so `chamber` produces nothing on a P1 or A1: those models publish a chamber value with no real sensor behind it, and Bambuddy leaves it out rather than putting a number on screen that means nothing.
 
@@ -825,8 +999,8 @@ They are **not** in the default set, so an overlay URL you are already using loo
 # Show only progress and ETA
 /overlay/1?show=progress,eta
 
-# Show everything including printer name
-/overlay/1?show=progress,layers,eta,filename,status,printer
+# Print details with printer name and model
+/overlay/1?show=progress,layers,eta,filename,status,printer,model
 
 # Minimal overlay - just progress
 /overlay/1?show=progress
@@ -858,8 +1032,10 @@ They are **not** in the default set, so an overlay URL you are already using loo
 When no print is running, the overlay shows:
 
 - Camera feed (still active)
-- "Printer is idle" or "Printer offline" message
+- The status line, such as "Idle", "Finished" or "Printer offline", when `status` is in `show=`
 - Bambuddy logo
+
+Progress, layers, time remaining and temperatures are hidden while the printer is offline. Without `status` in `show=`, an idle or offline printer shows no status text.
 
 ### Troubleshooting
 
@@ -881,6 +1057,25 @@ When no print is running, the overlay shows:
 - Check that camera streaming works in Bambuddy directly
 - The overlay uses the same camera stream as the main app
 
+**Camera freezes after running for a while**
+
+The overlay renews its camera connection every 60 seconds, even if the browser
+reports no image error. Reported image errors retry after three seconds. Each
+new connection starts a fresh 60-second renewal period. The overlay keeps its
+saved URL, token, FPS setting, rotation, and status display during renewal.
+Recovery is disabled in status-only mode (`camera=false`).
+
+Healthy connections are renewed too. A renewal joins the camera stream
+Bambuddy already has open for the printer and shows the latest frame at once,
+so a working picture doesn't flicker. Renewal can't bring back a printer that
+is offline or whose camera has stopped: the overlay picks the picture up again
+once the printer sends frames.
+
+If the camera remains frozen, check whether it works on Bambuddy's printers
+page, then try refreshing the browser source. When reporting the problem,
+include your Bambuddy version, browser-source application, and approximate time
+until the freeze. Do not share the token or full private overlay URL.
+
 **Status not updating**
 
 - WebSocket connection may have failed
@@ -895,14 +1090,14 @@ For Home Assistant, Frigate, kiosks, or any external integration that needs a st
 
 ### Creating a Token
 
-1. Go to **Settings** → **API Keys**
-2. Scroll to **Camera API Tokens** (below the Webhook Endpoints documentation)
+1. Go to **Settings** → **Camera**
+2. Scroll to **Camera API Tokens** (below External Cameras)
 3. Enter a descriptive name (e.g., `Home Assistant`, `Kitchen Kiosk`, `Frigate`)
 4. Pick a **scope** (see below)
 5. Pick a lifetime (1–365 days, default 90)
 6. Click **Create**
 
-The plaintext token is displayed **exactly once** in a copy-to-clipboard modal. Save it now — it can never be retrieved again.
+For every scope, the plaintext token is returned **exactly once**, at creation. Save it from the copy-to-clipboard modal, or copy the complete URL when creating a token directly in the [overlay builder](#streaming-overlay-token-login-enabled-deployments). It cannot be retrieved again.
 
 ### Scopes
 
@@ -994,8 +1189,9 @@ http://your-bambuddy/camwall?token=bblt_…&maxLive=9&interval=10
 ### Security & Limits
 
 - **Maximum lifetime is 365 days.** Bambuddy explicitly rejects "never expires" because a leaked permanent token would be irrevocable footgun-by-design.
-- **Tokens are stored as a hash.** A DB dump can't be replayed against the camera endpoint.
-- **Scoped, and scopes don't leak into each other.** A Camera stream token reaches only the stream and snapshot endpoints; a Cam Wall token additionally reaches the Cam Wall feed; a Streaming Overlay token additionally reaches one printer's overlay status. None can call any other Bambuddy API, and none exposes an IP address, serial number or access code.
+- **Tokens are stored as a hash.** A DB dump can't be replayed against the camera endpoint, and a token cannot be recovered from its hash. Token lists show names and dates, never the token itself. Treat saved browser-source URLs as credentials.
+- **Browser memory only.** The builder does not save entered, imported or newly created credentials in browser storage. Leaving or reloading clears them.
+- **Scoped, and scopes don't leak into each other.** A Camera stream token reaches only the stream and snapshot endpoints; a Cam Wall token additionally reaches the Cam Wall feed; a Streaming Overlay token additionally reaches one printer's overlay status and the shared overlay logo. None can call any other Bambuddy API, and none exposes an IP address, serial number or access code.
 - **Revocable at any time.** Owners can revoke their own tokens; admins can revoke anyone's from the same panel.
 - **Last-used timestamp** is shown so you can identify dead config and clean up.
 
@@ -1003,11 +1199,11 @@ http://your-bambuddy/camwall?token=bblt_…&maxLive=9&interval=10
 
 Creating and managing camera tokens requires the `camera:view` permission — the same permission already needed for the existing 60-minute browser-side stream tokens. Default Viewers and Operators groups have it.
 
-To delegate token management to a non-admin user, ensure they're in a group with both `camera:view` and `settings:read` (so they can reach Settings → API Keys).
+To delegate token management to a non-admin user, ensure they're in a group with both `camera:view` and `settings:read` (so they can reach Settings → Camera).
 
 ### Revoking a Token
 
-1. Go to **Settings** → **API Keys** → **Camera API Tokens**
+1. Go to **Settings** → **Camera** → **Camera API Tokens**
 2. Find the token in the list (use the `lookup_prefix` to identify it if you've forgotten the name)
 3. Click **Revoke**, confirm in the modal
 

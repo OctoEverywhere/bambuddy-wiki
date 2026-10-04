@@ -8,6 +8,7 @@ When enabled, authentication provides:
 
 - **User Accounts**: Create multiple users with unique credentials
 - **Group-Based Permissions**: 80+ granular permissions organized by feature
+- **Printer Access per Group**: Limit a team to its own printers on a shared fleet
 - **Customizable Groups**: Create custom groups or use default system groups
 - **Secure Authentication**: JWT tokens with password hashing using PBKDF2
 - **User Activity Tracking**: See who uploaded archives, library files, queued prints, and started prints
@@ -31,7 +32,7 @@ Permissions follow a `resource:action` pattern. Categories include:
 
 - **Printers**: read, create, update, delete, control, files, ams_rfid, clear_plate
 - **Archives**: read, create, update_own, update_all, delete_own, delete_all, reprint_own, reprint_all
-- **Queue**: read, create, update_own, update_all, delete_own, delete_all, reorder
+- **Queue**: read, create, update_own, update_all, delete_own, delete_all, reorder, start_unreviewed
 - **Library**: read, upload, update_own, update_all, delete_own, delete_all
 - **Projects**: read, create, update, delete
 - **Inventory**: read, create, update, delete, view_assignments
@@ -74,11 +75,76 @@ For archives, queue items, and library files, permissions are split into "own" a
 
 Items created before authentication was enabled (or by deleted users) have no owner. These "ownerless" items require `*_all` permission to modify.
 
-Library **folders** never track an owner, so deleting a folder with contents requires `library:delete_all`. One exception: users with `library:delete_own` may delete **empty** folders (no subfolders, no files — including trashed ones); external and project/archive-linked folders always require `library:delete_all`. See [File Manager → Deleting Folders](file-manager.md#deleting-folders).
+Library **folders** have an owner too, the user who made them. With `library:read_own` a user sees only their own folders, folders an admin shared with everyone, and the folders holding their files; they add files only to their own and shared folders. `library:delete_own` deletes your own folder when everything in it is yours, or an empty folder without an owner. See [File Manager → Folder Ownership & Sharing](file-manager.md#folder-ownership-sharing) and [Deleting Folders](file-manager.md#deleting-folders).
 
 ### Users in Multiple Groups
 
 Users can belong to multiple groups. Permissions are **additive** - a user has all permissions from all their groups combined.
+
+### Jobs That Wait for Review
+
+Use this when staff should look at every job before it prints, for example in a school or FabLab where students submit their own jobs.
+
+Without **Print Without Review** (`queue:start_unreviewed`), a user can still queue jobs, but every job they queue waits with a **Waiting for review** badge until someone with `queue:update_all` starts it with :material-play: **Play**. The print dialog tells them so. Users with `queue:update_all` are the reviewers, so their own jobs never wait. They can't start their waiting jobs themselves, also not by switching off manual start in the editor, and they can't start jobs from a virtual printer that have no owner yet.
+
+To set it up, create a group for the students with `queue:create` and the "own" queue permissions, and leave **Print Without Review** off. Give the staff `queue:update_all`. Combined with "own" read permissions, students only see their own jobs and files.
+
+It applies to every way a job is queued: the print dialog, the file manager, more runs of a batch, pipelines, API keys and the webhook. A key queues like its owner, and a key whose owner needs review can't start waiting jobs through the webhook.
+
+Administrators and the Operators group have the permission. On upgrade, every group that could queue, start or run jobs was given it once, so nothing changes until you take it away from a group. Groups you create afterwards don't have it until you tick it.
+
+### Printer Access
+
+Permissions decide *what* a user may do. **Printer access** decides *on which printers*. Use it when several teams share one Bambuddy, or to keep a printer free for a training session.
+
+Printer access has its own page: **Settings → Authentication → Printer access** (admins only). Pick a group, switch on **Limit members to the printers and locations chosen here**, and choose what the group may use:
+
+- **Whole location**: every printer whose location matches, now and later. A printer added to "Lab A" reaches the Lab A team without anyone ticking it.
+- **Single printers**: tick them one by one, on top of any locations.
+
+Members of that group then see and control only those printers:
+
+- The printer list and dashboard, camera streams, the queue and batches, archives, projects, statistics, print log, pipeline runs, maintenance, smart plugs, spool assignments, scheduled drying, failure detection and firmware leave the other printers out.
+- Live updates for the other printers don't reach them.
+- Opening one of the other printers, or an archive or job from one, by its address answers as if it didn't exist.
+
+How it combines:
+
+| Situation | Printers the user sees |
+|-----------|------------------------|
+| In no group with printer access switched on | All printers (the default, so nothing changes until you limit a group) |
+| In one limited group | That group's printers |
+| In several limited groups | All of those groups' printers together |
+| In a limited group and in a group without the switch (e.g. Operators) | Only the limited group's printers. A group without the switch never widens access |
+| In a limited group with no printers or locations chosen | None |
+| Administrator | All printers, always |
+
+A typical setup keeps the permissions in one group (for example **Operators**) and the printers in a second group per team (**Team A**, **Team B**), and puts each user in both.
+
+Things that follow the same rule:
+
+- **API keys** reach only the printers of the user who created them, even if the key itself allows more. A key limited to some printers has to queue to a specific printer: "Any <model>" jobs and pipelines aimed at a printer class are refused for it. See [API Keys](api-keys.md).
+- **Camera stream links, Cam Wall and streaming-overlay tokens** show only the printers of whoever created them.
+- **Queued jobs**: a job for "Any <model>" only goes to a printer its owner may use. A job pinned to a printer that was later taken away from its owner waits, showing the reason, until access returns or you move it to another printer. Deleting a limited user while keeping their items stages their "Any <model>" jobs for a manual start, so you decide where they run.
+
+#### Working with many printers and groups
+
+- **By group** lists the groups on the left, with a search and a filter for limited and not limited groups. On the right, the selected group's printers are grouped by location. Each location shows how many of its printers the group reaches and has a **Whole location** box.
+- Search by name, model, serial or location, and filter by location, model, or whether the group has access. **Tick all shown** and **Untick all shown** act only on the printers the filters leave, so "all X1C in Lab B" is one search and one click.
+- **By printer** lists every printer with the limited groups that reach it. A group that reaches it through its location is marked with a pin and is changed under **By group**. A group that has it ticked can be removed there, and **Give access to…** adds one. The page also names the users who are in no limited group, because they see every printer whatever the groups say.
+- **Who has access** in a printer card's menu opens **By printer** on that printer.
+- Changes from either view are collected and saved together, or discarded, from the bar at the bottom.
+
+A location given to a group that no printer has any more (renamed or emptied) stays listed with the group so you can remove it.
+
+#### Moving printers between locations
+
+With locations given to groups, a printer's location is an access setting. The printer edit dialog names the groups a move affects, and only an admin can move a printer into or out of a location a limited group has. Locations are matched exactly, apart from leading and trailing spaces, which are removed when you save the printer.
+
+Printers you add are only reached by limited groups that have the printer's location. Otherwise, tick them for each group that should have them.
+
+!!! note
+    Printer access limits what Bambuddy shows and does. It cannot stop someone who has a printer's access code from sending a job to it directly from a slicer on the network.
 
 ## Enabling Authentication
 
@@ -171,7 +237,7 @@ Note: You cannot delete yourself or the last administrator. Ownerless items requ
 ### Editing Groups
 
 1. Click the edit icon next to a group — this opens the full-page group editor
-2. Modify name, description, or permissions
+2. Modify name, description or permissions. The editor shows a summary of the group's [printer access](#printer-access) with a link to change it
 3. Click **Save**
 
 Note: System groups (Administrators, Operators, Viewers) cannot be deleted.
@@ -316,7 +382,7 @@ Bambuddy supports LDAP/Active Directory authentication, allowing users to log in
    - **User Search Filter** — LDAP filter to find users. `{username}` is replaced with the login name
      - Active Directory: `(sAMAccountName={username})`
      - OpenLDAP: `(uid={username})`
-3. Click **Save**, then **Test Connection** to verify
+3. Click **Save**, then **Test Connection** to verify. If it reports that the server refused StartTLS, the server only offers LDAPS (lldap is one): choose **LDAPS** and use its `ldaps://` URL and port
 4. Click **Enable** to activate LDAP authentication
 
 !!! warning "TLS Required"
@@ -348,9 +414,11 @@ LDAP groups can be mapped to BamBuddy groups for automatic role assignment. The 
 
 - Keys are LDAP group DNs (case-insensitive matching)
 - Values are BamBuddy group names
-- Both Active Directory groups (`memberOf` attribute) and POSIX groups (`memberUid` attribute) are supported
+- Membership is read from the user's `memberOf` attribute (Active Directory, lldap, OpenLDAP with the memberof overlay, 389-DS), from `groupOfNames` / `groupOfUniqueNames` groups that list the user in `member` / `uniqueMember`, and from POSIX groups (`memberUid`)
+- Groups are found anywhere in the directory, not only under the **Search Base**, so a Search Base of `ou=people,dc=example,dc=com` still finds groups under `ou=groups,dc=example,dc=com`
 - A user's POSIX **primary** group — the one their `gidNumber` points at — counts as full membership, the same as Unix treats it
 - Group membership is synced on every login
+- [Printer access](#printer-access) follows the mapped groups: map a directory group to a group limited to its printers, and its members see only those. A change in the directory takes effect at the user's next login
 
 !!! tip "No Mapping? No Problem"
     If no group mapping is configured, LDAP users are created without any group. Admins can manually assign groups in BamBuddy afterward.
@@ -359,9 +427,19 @@ LDAP groups can be mapped to BamBuddy groups for automatic role assignment. The 
     The POSIX lookups above need your directory to define the `posixGroup` object
     class in its published schema. Some directories do not — lldap is the common
     one: it marks every account it creates as `posixAccount`, but its groups are
-    only ever `groupOfNames`. There is nothing to configure. BamBuddy notes the
-    absence in the log and maps groups from `memberOf`, which is where those
-    directories keep membership anyway.
+    only ever `groupOfNames` / `groupOfUniqueNames`. There is nothing to configure. BamBuddy notes the
+    absence in the log and maps groups from `memberOf` and from the groups that
+    list the user, which is where those directories keep membership anyway.
+
+!!! info "Why groups are asked as well as `memberOf`"
+    Outside Active Directory, `memberOf` can be incomplete. Plain OpenLDAP has
+    none unless the memberof overlay is loaded, and the overlay tracks only the
+    group class it was set up for and only groups changed after it was loaded.
+    So on every directory except Active Directory, BamBuddy also searches for
+    `groupOfNames` and `groupOfUniqueNames` entries that list the user. The
+    service account (**Bind DN**) needs read access to the groups for this. On
+    lldap, a service account in `lldap_strict_readonly` has it; a plain lldap
+    user can't read other users either, so LDAP login would not work at all.
 
 ### Password Management
 
@@ -471,6 +549,8 @@ Everything else is optional and shown here with its default:
 | `BAMBUDDY_OIDC_ICON_URL` | *(none)* | Same rules as the UI icon field |
 | `BAMBUDDY_OIDC_AUTOLOGIN` | `false` | Redirect straight to this provider |
 | `BAMBUDDY_OIDC_DEFAULT_GROUP` | *(none)* | Group new users land in — a group **name**, see below |
+| `BAMBUDDY_OIDC_GROUP_CLAIM` | `groups` | Claim to read IdP groups from — see [Group Sync](#group-sync) |
+| `BAMBUDDY_OIDC_GROUP_MAPPING` | *(none)* | JSON object mapping IdP groups to BamBuddy group **names** |
 
 Booleans accept `true`, `1` or `yes` for on and `false`, `0` or `no` for off
 (case-insensitive). Leaving a variable out, or setting it to an empty value,
@@ -595,6 +675,88 @@ the database.
     `BAMBUDDY_LOCAL_LOGIN=true` re-enables username and password sign-in. See
     [Recovery](#recovery-bambuddy_local_logintrue) below.
 
+### Group Sync
+
+OIDC providers can sync the user's groups from the identity provider into
+BamBuddy groups on every login — the same behaviour the LDAP group mapping has
+had since the beginning. Two per-provider settings control it:
+
+- **Group Claim** — the JWT claim that carries the user's groups at the IdP.
+  Defaults to `groups`. Providers put groups in different claims (Keycloak:
+  `groups` as an array after a client mapper; Authentik: `groups` as an array;
+  some setups use `roles` or a custom claim), so the claim name is configurable
+  like the Email Claim. Namespaced claims such as `app/roles` are accepted
+  too, for Auth0. The claim value may be a JSON array or a
+  space/comma-separated string — both are accepted. The claim is read from the
+  **ID token** only, not from the userinfo endpoint: make sure your IdP puts the
+  groups into the ID token (in Keycloak, the group mapper's *Add to ID token*
+  switch; elsewhere often a scope such as `groups` that has to be added to
+  **Scopes**).
+- **Group Mapping** — which IdP group maps to which BamBuddy group. The admin
+  picks the pairs; names do not have to match. With no mapping configured the
+  feature is off and the provider behaves exactly as before.
+
+```json
+{
+  "fablab-staff": "Operators",
+  "students": "Viewers"
+}
+```
+
+The provider form builds the mapping as rows, with the BamBuddy side limited to
+existing groups, so an unknown group cannot be entered by accident. A row with
+only one side filled in, or a second row for an IdP group already mapped above
+(compared ignoring case), is flagged and blocks **Save** until you complete or
+remove it. A row left completely empty is simply skipped:
+
+![OIDC provider form with Group Claim and Group Mapping rows](../assets/settings-oidc-group-sync.png)
+
+How the sync behaves:
+
+- **Runs on every SSO login**, not just when the account is created.
+- **Only the mapped slice is managed.** Groups named in the mapping follow the
+  IdP; any other group on the user is a manual assignment and survives logins
+  unchanged. Promoting a user into a non-mapped group therefore sticks — the
+  same rule the LDAP sync settled on after #1292.
+- **Revocation propagates.** Losing the IdP group removes the mapped BamBuddy
+  group at the next login.
+- **[Printer access](#printer-access) follows the groups.** An IdP group mapped
+  to a group limited to its printers limits its members the same way, from
+  their next login.
+- **Matching is case-insensitive** on the IdP side, and a missing claim simply
+  means "no mapped groups" — it never blocks a login that already
+  authenticated. Neither does a sync that fails: the error is logged and the
+  user keeps the groups they had.
+- **The Default Group is not re-applied.** It is assigned once, when the
+  account is created; the sync never puts it back, so moving a user out of it
+  sticks.
+
+> **Deleting a mapped group:** removing a BamBuddy group does not rewrite any
+> provider's mapping. The mapping row is flagged in the form (red border, the
+> stale name shown as *(deleted)*) until you pick a replacement or remove the
+> row; at sync time a dangling entry is skipped.
+
+> **Renaming a mapped group has the same effect.** Mappings store group
+> **names**, so renaming a non-system BamBuddy group turns its mapping row
+> into an orphan just like a deletion does — and users who already hold that
+> group keep it, because the group is no longer in the set the mapping
+> manages. The LDAP group mapping behaves the same way.
+
+Via environment variables, the same two settings are `BAMBUDDY_OIDC_GROUP_CLAIM`
+(default `groups`) and `BAMBUDDY_OIDC_GROUP_MAPPING` (a JSON object whose values
+are BamBuddy group **names**, not IDs):
+
+```bash
+BAMBUDDY_OIDC_GROUP_MAPPING={"fablab-staff":"Operators","students":"Viewers"}
+```
+
+Like `BAMBUDDY_OIDC_DEFAULT_GROUP`, a mapping value that matches no group is
+**refused** — the whole provider configuration is skipped, the reason is
+logged, and the app still starts. Invalid JSON, a value that is not a group
+name (such as `null` or a number), and two IdP groups that differ only by case
+are rejected the same way, with the reason in the log.
+Removing the variable clears the mapping on the next boot.
+
 ### Provider Icons
 
 If an **Icon URL** is configured, Bambuddy fetches the image server-side at save time and caches the bytes in the database. The SSO button on the login page then loads the icon from a same-origin proxy at `/api/v1/auth/oidc/providers/{id}/icon` — never from the IdP's host directly.
@@ -630,6 +792,8 @@ Two independent toggles per provider:
 | **Auto-link existing accounts** | Off | On first successful SSO login where the verified email matches an existing local user, link the two accounts. Off → admins must pre-link manually to prevent silent takeover by an attacker-controlled IdP |
 | **Email Claim** | `email` | JWT claim used as the user's email identity. Set to `preferred_username` or `upn` for Azure Entra ID. Custom claims bypass the `email_verified` check entirely |
 | **Require Email Verified** | On | Only accept the email claim if the provider marks it as verified (`email_verified: true`). Disable only when the provider never sends this flag (e.g. Azure Entra ID) or when using a custom Email Claim |
+| **Group Claim** | `groups` | JWT claim that carries the user's IdP groups — see [Group Sync](#group-sync) |
+| **Group Mapping** | *(empty)* | IdP group → BamBuddy group pairs; empty disables group sync |
 
 Auto-link is gated by an additional check: if the target user already has any OIDC link, a second IdP cannot auto-link to the same account.
 

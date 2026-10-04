@@ -251,7 +251,7 @@ A print the printer reports as *Completed* can still be scrap — warped, out of
 
 ### Answering
 
-When the print completes, a dialog with the [finish photo](#when-the-finish-photo-is-taken) and thumbs-up / thumbs-down buttons opens in the web UI. On the phone, the **Outcome Confirmation** [notification event](notifications.md#event-triggers) asks as well: on **ntfy** and **Telegram** it carries Good/Reject buttons that answer from the notification itself; on every other channel, Pushover and Bark included, it carries a link that opens the outcome dialog in Bambuddy.
+When the print completes, a dialog with the [finish photo](#when-the-finish-photo-is-taken) and thumbs-up / thumbs-down buttons opens in the web UI. On the phone, the **Outcome Confirmation** [notification event](notifications.md#event-triggers) asks as well: on **ntfy** and **Telegram** it carries Good/Reject buttons that answer from the notification itself; on every other channel, Pushover and Bark included, it carries a link that opens the outcome dialog in Bambuddy. On Telegram you can also answer by reacting 👍 / 👎 to the message itself — no External URL or inbound access needed; see [Verdict mode](notifications.md#verdict-mode).
 
 The printer card asks too: while an answer is pending, the plate-clear area of the expanded card shows the question — thumbs-up records *Good* right there, thumbs-down opens the dialog for an optional reason, and simply clearing the plate works exactly as before.
 

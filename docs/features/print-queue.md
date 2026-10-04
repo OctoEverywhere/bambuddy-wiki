@@ -41,6 +41,17 @@ The Queue tab lets you:
 !!! warning "SD Card Required"
     An SD card must be inserted in your printer for the print queue to work. Files are transferred to the printer's SD card when prints start.
 
+### Filament shown on queue cards
+
+Since 1.2.6 ([#3132](https://github.com/maziggy/bambuddy/issues/3132)) each queue row shows a colour swatch and name for every filament the job uses, so you can check the next colours without opening **Edit Queue Item**. The row shows what the job is set to print with, not just the colour stored in the 3MF:
+
+- **Jobs mapped to AMS slots** on a specific printer show the slot, the spool assigned to it in Inventory (or Spoolman) and its colour, read from the printer's current AMS contents, for example `A1 · eSUN PLA Basic · Bone White`. Slots are labelled `A1`–`A4`, `B1`–`B4` and so on, `HT-A` for an AMS-HT, and `External` (or `Ext-L` / `Ext-R` on dual-nozzle printers) for the external spool. The mapping comes from [AMS Filament Mapping](#ams-filament-mapping).
+- **Jobs without a slot mapping** show the colour chosen when queueing, or otherwise the selected plate's colour from the 3MF, with no slot. That covers model-based jobs such as **Any P2S**, jobs on a specific printer with no stored mapping, and mapped jobs whose printer isn't currently reporting that slot.
+- **Up to two filaments** get a swatch and label each. With more than two, the row shows just the swatches; hover over them to see the full list (touch screens have no hover, so open the job instead).
+
+!!! warning "Emptied slots"
+    If a mapped slot has been emptied since the job was queued, the row says so in yellow, for example `A3 · Empty · Caramel`: the job will still be sent to that slot, so load a spool or edit the mapping. It uses the same check as the Printers page, so a slot shown there as `?` (typically a spool without an RFID tag) is not reported as empty. The external spool is never reported as empty, because the printer doesn't say whether one is loaded.
+
 ### Per-job ETA
 
 Since 1.2.6 ([#2736](https://github.com/maziggy/bambuddy/issues/2736)) a queue row shows an **ETA** beside its print duration — the clock time the job would finish if it started now, in your configured 12/24-hour format. It is a per-job answer, not a forecast of the whole queue.
@@ -124,7 +135,9 @@ You do not have to pick anything. Positions are assigned for you, preferring one
     Stopping is deliberate: printing from a hotend other than the one the plate was levelled with puts the first layer millimetres above the plate.
 
 !!! tip "Stored Mappings"
-    AMS mappings are saved when you add a print to the queue. When the print starts, Bambuddy uses your configured mapping instead of auto-matching again.
+    AMS mappings are saved when you add a print to the queue. When the print starts, Bambuddy checks the saved mapping against the trays the printer has loaded at that moment. If it still fits, it is used as saved, including any trays you picked by hand. If a slot now points at an empty tray or a tray holding a different material, the mapping is worked out again for that printer. That covers a spool moved after queueing, and a mapping that was made for another printer. A slot you deliberately put on a tray of another material in the mapping panel is kept as you chose it.
+
+    When the same job is queued to several printers at once, each printer gets its own mapping, matched against its own AMS.
 
 !!! info "Preset match and colour match are separate judgements"
     The filament preset ID (`tray_info_idx`) names the **variant**, not an individual spool &mdash; `GFA00` is PLA Basic, `GFA01` PLA Matte, `GFA17` PLA Translucent, whatever colour the spool is. So when your slice asks for PLA Matte and exactly one Matte spool is loaded, auto-match selects it because it is the right variant, *and then still checks the colour*. If the colour differs you get the amber **Color mismatch** status on that slot rather than a green tick, and the slot stays selected so you can print anyway or pick another. Since [#2687](https://github.com/maziggy/bambuddy/issues/2687) the auto-matched and manually-picked verdicts for a given tray always agree.
@@ -294,6 +307,10 @@ Grouping tells you which queue items belong together. An **order** additionally 
 
 The **Batches** tab on the Print Queue page is where orders live. It is a separate tab because an order outlives the queue that produced it: once its runs finish they leave the active queue entirely, so the Queue tab and the History tab each hold only half the picture.
 
+### Linking to one order
+
+`/queue?batch=<id>` opens the Batches tab with that order highlighted and scrolled into view, whatever its status. Bambuddy Orders uses this for its **In Bambuddy** links.
+
 ### What an order tracks
 
 | Column | Meaning |
@@ -363,7 +380,7 @@ Prioritize shorter print jobs so more jobs complete sooner.
 
 ### How It Works
 
-When SJF is enabled, the scheduler picks the shortest pending print for each printer instead of following FIFO order:
+When SJF is enabled, the scheduler picks the shortest pending print for each printer instead of following FIFO order. Jobs pinned to a printer and "Any <model>" jobs that can run on it are compared together:
 
 1. **Jumped items first** — jobs that were previously skipped get top priority (starvation guard)
 2. **Shortest duration next** — among remaining items, the shortest print time wins
@@ -375,7 +392,7 @@ The queue page automatically reorders to show the scheduler's actual execution o
 
 Without protection, a long job could be postponed indefinitely as shorter jobs keep arriving. SJF includes an automatic fairness mechanism:
 
-- When a shorter job jumps ahead of a longer one, the longer job is flagged as "jumped"
+- When a shorter job jumps ahead of a longer one, the longer job is flagged as "jumped" &mdash; also when one is pinned to the printer and the other is an "Any <model>" job
 - A jumped job **cannot be skipped again** — it moves to the front of the queue on the next cycle
 - This guarantees every job eventually prints, regardless of duration
 
@@ -485,6 +502,11 @@ Reorder prints in the queue:
 
 Prints execute in order from top to bottom.
 
+This is one order for the whole queue, whatever each job is queued for. A job pinned to a printer and an "Any P2S" job compete for the same printer, and whichever is **higher in the list** gets it. A job that can't start yet, for example because its printer is busy, does not hold up the jobs below it on other printers.
+
+!!! note "Since 1.2.6b1 ([#3200](https://github.com/maziggy/bambuddy/issues/3200))"
+    Earlier versions sorted by target first: on SQLite an "Any <model>" job always won a printer over a job pinned to it, and on PostgreSQL the pinned job always won, wherever you had dragged them. New jobs now go to the end of the whole list, not the end of their printer's part of it.
+
 ### Multi-drag
 
 Move several items as a contiguous block:
@@ -542,6 +564,9 @@ Use Queue Only to:
 
 !!! tip "Batch Workflow"
     Add multiple prints with Manual Start, review the order, then release them one by one or all at once.
+
+!!! note "Jobs that wait for review"
+    For users without **Print Without Review**, every job waits like this, shown as **Waiting for review**, and only someone who can manage all queue jobs can start it. See [Jobs That Wait for Review](authentication.md#jobs-that-wait-for-review).
 
 ---
 
@@ -1159,6 +1184,15 @@ The waiting reason tells you exactly what's needed:
 - **Waiting on \<sensor\>**: A [Home Assistant sensor](sensors.md#hold-prints-while-alerting)
   set to hold prints is alerting — an enclosure door left open, say. The job
   starts by itself once the sensor clears; nothing is cancelled.
+- **Needs \<filament\>** (e.g. "Needs PETG #2850E0"): the printer the job was
+  about to go to has no tray loaded with a filament the plate prints. Rather
+  than let the printer pick a substitute, the job is held for a manual start.
+  This applies to jobs on a specific printer too, not only model-based ones.
+  Load the spool and press **Start**: Bambuddy finds it and the job prints.
+  If the filament is still missing, **Start** names it and offers **Print
+  Anyway**, which sends the job the way it went out before. A model-based job gives its
+  printer back when it is held, so **Start** lets the queue choose among all
+  printers of that model again.
 
 ### Compatibility Warnings
 
@@ -1353,6 +1387,9 @@ A persistent toast notification shows real-time dispatch progress:
 
 !!! warning "If a printer takes the file but never starts"
     Bambuddy waits for the printer to actually begin printing after it accepts the file. If it never does, the job is put back in the queue and dispatched again — but only up to **three** times. After that the item is marked failed rather than re-uploading the same file indefinitely, because at that point the fault is on the printer: check its screen for a prompt or an error, and check that its SD card is inserted and readable.
+
+!!! info "If the file never reaches the printer"
+    When the printer's file service refuses the upload, does not answer, or drops the connection, the job stays in the queue instead of failing, and Bambuddy sends that printer no new jobs for five minutes. Jobs for any printer of that model go to the others. A job assigned to that printer shows *"&lt;printer&gt; is not accepting files — Bambuddy will retry automatically"* and is sent again when the wait is over. If the printer refuses again, the wait doubles each time, up to an hour, and the first upload that gets through resets it. You get one **Job Waiting** notification per outage, not one per retry, and **Keep bed warm between prints** does not heat a printer while it waits. A rejected access code, a full or missing SD card, or an upload too slow to finish still fails the job, because sending it again would fail the same way.
 
 ---
 

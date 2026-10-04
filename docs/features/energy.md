@@ -110,10 +110,11 @@ Per-print energy also feeds the [Statistics page](statistics.md): the **Filament
 
 ### Setting Electricity Rate
 
-1. Go to **Settings** > **General**
-2. Find **Electricity Cost**
-3. Enter your rate per kWh
-4. Choose currency
+1. Go to **Settings** > **General** > **Cost Tracking**
+2. Choose the **Electricity price source**:
+    - **Fixed price**: enter your rate per kWh under **Electricity cost per kWh**
+    - **Home Assistant sensor**: pick the sensor that holds your current price, see [Dynamic Electricity Rates](#dynamic-electricity-rates)
+3. Choose currency
 
 ### Cost Formula
 
@@ -125,6 +126,16 @@ Print Cost = (Energy in Wh / 1000) × Rate per kWh
 ```
 245 Wh at $0.15/kWh = 0.245 × 0.15 = $0.037
 ```
+
+### Energy Is Costed at the Price of the Hour It Was Used
+
+Bambuddy records the electricity price with each hourly energy reading, and costs the energy used in each hour at that hour's price:
+
+- **A print** that runs through a price change is costed hour by hour: its cheap hours at the cheap price and its expensive hours at the expensive one, not all of it at the price when it ends.
+- **The Statistics page** in **Total** mode does the same for any date range and for the all-time figure.
+- **Changing the price** applies to the energy used from then on. Energy already used keeps the price it was used at, so a new contract doesn't re-cost last year.
+
+Energy used since the last hourly reading, and energy from plugs without a lifetime counter (MQTT plugs), is costed at the current price. Energy recorded before this feature existed keeps the price that was set when you upgraded.
 
 ---
 
@@ -242,13 +253,28 @@ Total: $1.17
 
 ## :material-home-automation: Dynamic Electricity Rates
 
-If you have a dynamic electricity tariff (e.g., Tibber, Octopus Energy), you can automatically update the electricity rate from Home Assistant.
+If you have a dynamic electricity tariff (e.g., Amber, Tibber, Octopus Energy, Nord Pool), Bambuddy can take the price from Home Assistant. Each hour of energy is then costed at the price of that hour, see [Energy Is Costed at the Price of the Hour It Was Used](#energy-is-costed-at-the-price-of-the-hour-it-was-used).
 
-### How It Works
+### Read the Price Sensor (Recommended)
 
-Home Assistant pushes the current electricity price to Bambuddy's API whenever it changes. This ensures cost calculations always use the current rate.
+Bambuddy reads the price straight from a Home Assistant sensor, using the [Home Assistant connection](smart-plugs.md) you already set up for smart plugs:
 
-### Dynamic electricity price from Home Assistant
+1. Make sure Home Assistant is connected under **Settings** > **Network** > **Home Assistant**
+2. Go to **Settings** > **General** > **Cost Tracking**
+3. Set **Electricity price source** to **Home Assistant sensor**
+4. Under **Price sensor**, pick or type the sensor holding your current price, e.g. `sensor.amber_general_price`
+
+Bambuddy reads the sensor when you save, every hour, and at the start and end of every print. The price field then shows the last price read and can't be edited. If Home Assistant can't be reached, Bambuddy keeps using the last price it read.
+
+!!! info "Sensor units"
+    The sensor must give the price per kWh in your Bambuddy currency, e.g. `AUD/kWh` or `EUR/kWh`. Prices per MWh (common for Nord Pool and ENTSO-E day-ahead sensors) and per Wh are converted automatically. A sensor in cents (`c/kWh`, `ct/kWh`, `p/kWh`) needs a [template sensor](https://www.home-assistant.io/integrations/template/) that divides by 100. A negative price is costed as free.
+
+!!! tip "Time-of-use tariffs without an API"
+    If your provider has fixed peak and off-peak hours but no integration, create a template sensor in Home Assistant that returns the right price for the time of day, and pick that.
+
+### Push the Price from Home Assistant
+
+The older alternative, still supported: Home Assistant pushes the price to Bambuddy's API whenever it changes. Leave **Electricity price source** on **Fixed price** for this; the pushed price applies from the moment it arrives.
 
 #### 1. Create an API Key
 
