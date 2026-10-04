@@ -117,8 +117,12 @@ nobody watching a screen. On a large farm this is the one camera load that runs
 unattended, so it is worth being deliberate about:
 
 - Select only the printers that genuinely need watching.
-- Raise the poll interval. Failures develop over minutes, not seconds; 30&ndash;60
-  seconds is usually plenty.
+- For **Obico**, consider a **30&ndash;60 second** poll interval to reduce camera
+  load; its supported range is **5&ndash;120 seconds** (default **10 seconds**).
+- For **OctoEverywhere**, the inspection interval supports **5&ndash;30 seconds**
+  (default **20 seconds**). Choose **30 seconds** to reduce routine camera load.
+  Gadget can temporarily request faster checks, while its minimum interval and
+  retry delays still apply. See [Inspection Timing](../features/failure-detection.md#inspection-timing).
 
 ---
 

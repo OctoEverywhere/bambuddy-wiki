@@ -37,11 +37,15 @@ OctoEverywhere has a strict privacy policy for the Gadget AI APIs that states al
 | Setting | Behavior |
 |---------|----------|
 | **Confidence** | **Lowest**, **Low**, **Medium** (default), **High**, or **Highest**. Lower confidence reports possible failures sooner, with more potential false positives. Higher confidence requires more certainty before warning or pausing. |
-| **Inspection interval** | **20 seconds** by default. |
+| **Inspection interval** | **20 seconds** by default. Choose an interval from **5 to 30 seconds** with the slider. |
 | **Action on detected failure** | **Notify only** (default), **Pause print**, or **Pause and cut power**. Pause actions run when Gadget suggests pausing; cutting power also turns off enabled smart plugs linked to the printer. |
 | **Monitored Printers** | **Monitor all connected printers** is selected by default. Clear it to select a subset; selecting no printers monitors none. |
 
 A warning sends at most one notification per monitored print session. If Gadget later suggests pausing, **Pause print** or **Pause and cut power** runs once and sends a separate notification. With **Notify only**, the printer continues printing and no second notification is sent after the warning.
+
+### Inspection Timing
+
+The selected interval is subject to the server's minimum interval. When Gadget suggests faster inspections, Bambuddy temporarily uses its recommended interval if it is shorter than your selection, while still respecting the minimum. Camera capture, processing time, rate limits, and error retry delays can make checks take longer than the selected interval. The selected interval never overrides the server's minimum or retry timing.
 
 ### Status and Print Quality
 
@@ -62,14 +66,38 @@ The **Status** and **Recent Detections** cards show monitored prints and their r
 **Key rejected or account unavailable**
 : Check the saved Gadget API key and the status on the [Gadget API account page](https://octoeverywhere.com/gadgetapi). For a disabled key, [contact OctoEverywhere support](https://octoeverywhere.com/support). For an IP restriction, use the original key associated with that public IP or contact support if it is unavailable. After resolving access, click **Test** to resume inspections.
 
+**Usage limit reached**
+: When the API returns `OE_FREE_USAGE_LIMIT_REACHED`, Bambuddy shows **Usage limit reached.** with a **Set up billing to continue** link. Wait for the next monthly allowance, or optionally set up billing and turn off **Free Usage Only** on the [Gadget API account page](https://octoeverywhere.com/gadgetapi). If billing is already configured, only **Free Usage Only** needs changing. After the allowance renews or the account settings are updated, click **Test** to resume inspections.
+
+**IP restriction remains after changing account settings**
+: Changing billing settings or creating another key does not remove an IP restriction. Use the original Gadget API key associated with that public IP, or [contact OctoEverywhere support](https://octoeverywhere.com/support) if the key is unavailable or the IP is shared with another account. Click **Test** after resolving access.
+
 **Camera or connection failure**
-: Confirm the printer is connected, actively printing, and selected for monitoring. Check that its configured camera works in Bambuddy and that the Bambuddy host has DNS and outbound HTTPS access to OctoEverywhere. Temporary connection and service failures retry automatically.
+: Confirm the printer is connected, actively printing, and selected for monitoring. Check that its configured camera works in Bambuddy and that the Bambuddy host has DNS and outbound HTTPS access to OctoEverywhere. Temporary connection and service failures retry automatically; repeated failures delay subsequent retries.
+
+**Checks slower than the selected interval**
+: Camera capture, processing time, the server's minimum interval, rate limits, and error retry delays can lengthen the interval. See [Inspection Timing](#inspection-timing).
 
 **False alarms or late alerts**
 : Raise **Confidence** if healthy prints trigger warnings; lower it to report possible failures sooner. This is the opposite direction to Obico's **Sensitivity** control.
 
 **Detection appears but no notification arrives**
 : Enable **AI Failure Detection** on a working notification provider and check its printer filters. The settings page reports missing notification coverage; the provider's own test checks delivery.
+
+!!! warning "Account errors stop monitoring"
+    Key, account, IP restriction, and usage-limit errors stop inspections across all monitored printers until access is restored and **Test** succeeds with the configured key, or a replacement key is saved. These errors do not pause the printers.
+
+**Test** verifies access by creating a context; it does not upload an image or verify the remaining inspection allowance. A successful test resumes inspections, but the next inspection can stop monitoring again if the allowance is still exhausted. Creating another context or switching processing URLs does not reset the allowance.
+
+A successful **Test** with the same key preserves existing monitoring contexts. Saving a replacement key creates new contexts while preserving notification/action tracking and the current inspection timing.
+
+#### Inspection Debug Logs
+
+Each inspection logs its start and whether it reuses a context. Successful results include the printer ID, frame count, verdict, print quality, warning/pause suggestions, faster-inspection flag, server minimum, and effective interval until the next check. Failed attempts log a safe error message, recognized error code, and retry delay when another attempt is scheduled; canceled or discarded inspections are also recorded. Scheduled polls that are not yet due do not produce inspection logs. These diagnostics omit API keys, context IDs/URLs, image data, and raw API response bodies.
+
+### API Reference
+
+See [OctoEverywhere API Reference](../reference/api.md#octoeverywhere-ai-failure-detection) for settings keys, defaults, status and test endpoints, required permissions, and notification coverage fields.
 
 ---
 
