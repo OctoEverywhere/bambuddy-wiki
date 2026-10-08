@@ -1065,7 +1065,7 @@ When authentication is enabled, these endpoints require `settings:read` and
 | Key | Default / values |
 |-----|------------------|
 | `octoeverywhere_enabled` | `false` |
-| `octoeverywhere_api_key` | Write-only Gadget API key. Omit it from an update to preserve the saved key; send an empty string to clear it. Always empty in settings responses. |
+| `octoeverywhere_api_key` | Write-only Gadget API key. Omit it from an update to preserve the saved key; send an empty string to clear it. Always empty in settings responses and excluded from Git backups. |
 | `octoeverywhere_api_key_configured` | Read-only boolean indicating whether a key is saved; defaults to `false`. |
 | `octoeverywhere_poll_interval` | `20` by default; an integer from `5` to `30` seconds. Normally clamped to the server minimum; temporarily shortened to the recommended interval when `FasterInspectionSuggested` is true, still respecting the minimum. |
 | `octoeverywhere_confidence` | `medium`; accepts `lowest`, `low`, `medium`, `high`, `highest`, sent as API confidence levels 1, 2, 3, 4, 5 respectively for both `WarningConfidenceLevel` and `PauseConfidenceLevel`. |
@@ -1088,7 +1088,7 @@ All paths below are relative to the `/api/v1` base URL.
 
 | Endpoint | Purpose | Permission when authentication is enabled |
 |----------|---------|-------------------------------------------|
-| `GET /octoeverywhere/status` | Service status, `last_error_code`, `api_key_configured`, `poll_interval`, per-printer quality, recent history, and notification coverage. | `settings:read` |
+| `GET /octoeverywhere/status` | Service status, `last_error_code`, `api_key_configured`, `poll_interval`, per-printer quality, recent history, and notification coverage. Printer data, history, and coverage are limited to the caller's accessible printers. | `settings:read` |
 | `GET /octoeverywhere/printer-status` | Printer-card monitoring state, limited to the caller's accessible printers. Error messages and codes also require `settings:read`. | `printers:read` |
 | `POST /octoeverywhere/test-connection` | Test key/account eligibility using optional `api_key` and `confidence` fields, falling back to saved settings when omitted. Does not update settings or upload an image. | `settings:update` |
 
@@ -1104,9 +1104,10 @@ for account recovery steps.
 
 Notification providers use the existing `on_ai_failure_detection` event subscription.
 The status response's `notifications.configured` indicates that an enabled provider
-subscribes to this event; `notifications.uncovered_printers` lists monitored active
-printer IDs without a matching subscription. These fields describe configuration,
-not successful notification delivery.
+subscribes to this event for all printers or a printer within the caller's scope;
+`notifications.uncovered_printers` lists monitored active printer IDs within that
+scope without a matching subscription. These fields describe configuration, not
+successful notification delivery.
 
 Each per-printer status and Test result includes a nullable `error_code`. Status
 responses also include `last_error_code` alongside `last_error`. These codes identify
